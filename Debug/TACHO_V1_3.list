@@ -39326,6 +39326,7 @@ static void ESP32_Process_Command(uint8_t cmd, uint8_t *data, uint8_t len)
 
         case 0xCB: /* Debug Raw Oil Pulses */
         {
+        	//esp32 raw
             uint32_t t1 = ExtiCounter_GetOil1();
  800f37e:	f000 fe81 	bl	8010084 <ExtiCounter_GetOil1>
  800f382:	0003      	movs	r3, r0
