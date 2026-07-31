@@ -1,0 +1,2 @@
+../User/Hardware/ADC/adc_driver.c:12:6:ADC_Driver_Init	8	static
+../User/Hardware/ADC/adc_driver.c:21:10:ADC_Read_Channel	56	static

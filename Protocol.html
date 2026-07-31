@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tài Liệu Kỹ Thuật Modbus RTU - SmartRF</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --surface: #ffffff;
+            --primary: #0f172a;
+            --secondary: #334155;
+            --accent: #2563eb;
+            --border: #e2e8f0;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+
+        header {
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 0 0 0.5rem 0;
+        }
+
+        .doc-meta {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            display: flex;
+            gap: 2rem;
+        }
+
+        section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        h2 {
+            font-size: 1.35rem;
+            color: var(--primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.75rem;
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            color: var(--secondary);
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 0.85rem 1rem;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #b91c1c;
+        }
+
+        pre {
+            background-color: #0f172a;
+            color: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+        }
+
+        pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+        }
+
+        .frame-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .frame-byte {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 0.5rem;
+            text-align: center;
+            min-width: 80px;
+        }
+
+        .frame-byte .desc {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .frame-byte .val {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--primary);
+        }
+
+        ul {
+            padding-left: 1.5rem;
+            color: var(--text-main);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .badge.read { background: #e0f2fe; color: #0369a1; }
+        .badge.write { background: #f3e8ff; color: #7e22ce; }
+        .badge.otp { background: #fee2e2; color: #b91c1c; }
+
+        .footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 3rem;
+            border-top: 1px solid var(--border);
+            padding-top: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>TÀI LIỆU KỸ THUẬT GIAO THỨC MODBUS RTU</h1>
+        <div class="doc-meta">
+            <span><strong>Thiết bị:</strong> Cảm Biến</span>
+            <span><strong>Phiên bản:</strong> 1.0</span>
+            <span><strong>Ngày phát hành:</strong> 2026</span>
+        </div>
+    </header>
+
+    <section>
+        <h2>1. THÔNG SỐ GIAO TIẾP VẬT LÝ</h2>
+        <ul>
+            <li><strong>Giao diện phần cứng:</strong> RS-485 (Half-Duplex)</li>
+            <li><strong>Baud Rate:</strong> 9600 bps</li>
+            <li><strong>Data Bits:</strong> 8</li>
+            <li><strong>Parity:</strong> None</li>
+            <li><strong>Stop Bits:</strong> 1</li>
+            <li><strong>Byte Order:</strong> Big-Endian (High Byte truyền trước, Low Byte truyền sau)</li>
+            <li><strong>CRC:</strong> CRC-16 (Modbus), truyền Low Byte trước, High Byte sau.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>2. CẤU TRÚC KHUNG TRUYỀN RAW (MODBUS RTU FRAMES)</h2>
+        <p>Thiết bị hỗ trợ 3 mã lệnh (Function Codes) theo chuẩn Modbus RTU. Dưới đây là cấu trúc byte thô để hỗ trợ lập trình thư viện nhúng trên MCU Master (STM32, PIC, v.v.).</p>
+
+        <h3>2.1. Lệnh 0x03 - Read Holding Registers</h3>
+        <p>Đọc dữ liệu từ một hoặc nhiều thanh ghi 16-bit liên tiếp. (Số lượng thanh ghi tối đa = 6).</p>
+        <strong>Khung truyền Yêu cầu (Master Request): Length = 8 bytes</strong>
+        <div class="frame-box">
+            <div class="frame-byte"><span class="desc">Slave Address</span><span class="val">ID (1 byte)</span></div>
+            <div class="frame-byte"><span class="desc">Function</span><span class="val">0x03</span></div>
+            <div class="frame-byte"><span class="desc">Start Addr Hi</span><span class="val">0x00</span></div>
+            <div class="frame-byte"><span class="desc">Start Addr Lo</span><span class="val">0x00..0x05</span></div>
+            <div class="frame-byte"><span class="desc">Quantity Hi</span><span class="val">0x00</span></div>
+            <div class="frame-byte"><span class="desc">Quantity Lo</span><span class="val">0x01..0x06</span></div>
+            <div class="frame-byte"><span class="desc">CRC Lo</span><span class="val">CRC_L</span></div>
+            <div class="frame-byte"><span class="desc">CRC Hi</span><span class="val">CRC_H</span></div>
+        </div>
+
+        <strong>Khung truyền Phản hồi (Slave Response): Length = 5 + (2 × Quantity) bytes</strong>
+        <div class="frame-box">
+            <div class="frame-byte"><span class="desc">Slave Address</span><span class="val">ID (1 byte)</span></div>
+            <div class="frame-byte"><span class="desc">Function</span><span class="val">0x03</span></div>
+            <div class="frame-byte"><span class="desc">Byte Count (N)</span><span class="val">N = Qty × 2</span></div>
+            <div class="frame-byte"><span class="desc">Data 1 Hi</span><span class="val">High Byte</span></div>
+            <div class="frame-byte"><span class="desc">Data 1 Lo</span><span class="val">Low Byte</span></div>
+            <div class="frame-byte"><span class="desc">...</span><span class="val">...</span></div>
+            <div class="frame-byte"><span class="desc">CRC Lo</span><span class="val">CRC_L</span></div>
+            <div class="frame-byte"><span class="desc">CRC Hi</span><span class="val">CRC_H</span></div>
+        </div>
+
+        <h3>2.2. Lệnh 0x06 - Write Single Register</h3>
+        <p>Ghi dữ liệu 16-bit vào một thanh ghi đơn lẻ.</p>
+        <strong>Khung truyền Yêu cầu (Master Request): Length = 8 bytes</strong>
+        <div class="frame-box">
+            <div class="frame-byte"><span class="desc">Slave Address</span><span class="val">ID (1 byte)</span></div>
+            <div class="frame-byte"><span class="desc">Function</span><span class="val">0x06</span></div>
+            <div class="frame-byte"><span class="desc">Reg Addr Hi</span><span class="val">0x00</span></div>
+            <div class="frame-byte"><span class="desc">Reg Addr Lo</span><span class="val">0x01..0x05</span></div>
+            <div class="frame-byte"><span class="desc">Data Hi</span><span class="val">High Byte</span></div>
+            <div class="frame-byte"><span class="desc">Data Lo</span><span class="val">Low Byte</span></div>
+            <div class="frame-byte"><span class="desc">CRC Lo</span><span class="val">CRC_L</span></div>
+            <div class="frame-byte"><span class="desc">CRC Hi</span><span class="val">CRC_H</span></div>
+        </div>
+        <strong>Khung truyền Phản hồi (Slave Response):</strong> Giống hệt Khung truyền Yêu cầu (Echo).
+
+        <h3>2.3. Lệnh 0x10 - Write Multiple Registers</h3>
+        <p>Ghi dữ liệu vào nhiều thanh ghi liên tiếp.</p>
+        <strong>Khung truyền Yêu cầu (Master Request): Length = 9 + (2 × Quantity) bytes</strong>
+        <div class="frame-box">
+            <div class="frame-byte"><span class="desc">Slave Address</span><span class="val">ID (1 byte)</span></div>
+            <div class="frame-byte"><span class="desc">Function</span><span class="val">0x10</span></div>
+            <div class="frame-byte"><span class="desc">Start Addr Hi</span><span class="val">0x00</span></div>
+            <div class="frame-byte"><span class="desc">Start Addr Lo</span><span class="val">0x01..0x05</span></div>
+            <div class="frame-byte"><span class="desc">Quantity Hi</span><span class="val">0x00</span></div>
+            <div class="frame-byte"><span class="desc">Quantity Lo</span><span class="val">Qty</span></div>
+            <div class="frame-byte"><span class="desc">Byte Count</span><span class="val">N = Qty × 2</span></div>
+            <div class="frame-byte"><span class="desc">Data 1 Hi</span><span class="val">High Byte</span></div>
+            <div class="frame-byte"><span class="desc">Data 1 Lo</span><span class="val">Low Byte</span></div>
+            <div class="frame-byte"><span class="desc">...</span><span class="val">...</span></div>
+            <div class="frame-byte"><span class="desc">CRC Lo</span><span class="val">CRC_L</span></div>
+            <div class="frame-byte"><span class="desc">CRC Hi</span><span class="val">CRC_H</span></div>
+        </div>
+        <strong>Khung truyền Phản hồi (Slave Response): Length = 8 bytes</strong>
+        <div class="frame-box">
+            <div class="frame-byte"><span class="desc">Slave Address</span><span class="val">ID (1 byte)</span></div>
+            <div class="frame-byte"><span class="desc">Function</span><span class="val">0x10</span></div>
+            <div class="frame-byte"><span class="desc">Start Addr Hi</span><span class="val">0x00</span></div>
+            <div class="frame-byte"><span class="desc">Start Addr Lo</span><span class="val">0x01..0x05</span></div>
+            <div class="frame-byte"><span class="desc">Quantity Hi</span><span class="val">0x00</span></div>
+            <div class="frame-byte"><span class="desc">Quantity Lo</span><span class="val">Qty</span></div>
+            <div class="frame-byte"><span class="desc">CRC Lo</span><span class="val">CRC_L</span></div>
+            <div class="frame-byte"><span class="desc">CRC Hi</span><span class="val">CRC_H</span></div>
+        </div>
+    </section>
+
+    <section>
+        <h2>3. PHỤ LỤC: THUẬT TOÁN TÍNH CRC-16 (MÃ C/C++ THAM KHẢO)</h2>
+        <p>Hệ thống sử dụng chuẩn CRC-16/MODBUS (Đa thức <code>0xA001</code>, Giá trị khởi tạo <code>0xFFFF</code>). Dưới đây là hàm C/C++ tiêu chuẩn để Master (STM32/PIC) nhúng vào thư viện truyền thông:</p>
+        <pre><code>#include &lt;stdint.h&gt;
+
+// Hàm tính mã kiểm tra lỗi CRC-16 chuẩn Modbus RTU
+// buffer: con trỏ trỏ tới mảng byte cần tính (Ví dụ mảng chứa: [ID, Function, Data...])
+// length: số lượng byte trong mảng (Không bao gồm 2 byte CRC ở cuối)
+// Trả về: Giá trị CRC 16-bit (Lưu ý: Khi ghép vào mảng truyền đi, Byte Thấp (Lo) gửi trước, Byte Cao (Hi) gửi sau)
+uint16_t Modbus_CalculateCRC16(const uint8_t *buffer, uint16_t length) {
+    uint16_t crc = 0xFFFF; // Giá trị khởi tạo chuẩn
+    
+    for (uint16_t pos = 0; pos < length; pos++) {
+        crc ^= (uint16_t)buffer[pos]; // XOR byte dữ liệu vào CRC
+        
+        for (int i = 8; i != 0; i--) { // Lặp qua 8 bit
+            if ((crc & 0x0001) != 0) { // Nếu bit ngoài cùng bên phải là 1
+                crc >>= 1;             // Dịch phải 1 bit
+                crc ^= 0xA001;         // XOR với đa thức tiêu chuẩn
+            } else {
+                crc >>= 1;             // Chỉ dịch phải 1 bit
+            }
+        }
+    }
+    return crc;
+}</code></pre>
+    </section>
+
+    <section>
+        <h2>4. BẢN ĐỒ BỘ NHỚ (MODBUS REGISTER MAP)</h2>
+        <p>Bản đồ bộ nhớ gồm 6 thanh ghi (Registers) 16-bit. Địa chỉ logic bắt đầu từ <code>0x0000</code>.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Địa chỉ (Hex)</th>
+                    <th>Tên Thanh Ghi</th>
+                    <th>Quyền Truy Cập</th>
+                    <th>Mô Tả Cấu Trúc Dữ Liệu</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>0x0000</code></td>
+                    <td><strong>Raw Data</strong></td>
+                    <td><span class="badge read">Read Only</span></td>
+                    <td>
+                        Giá trị đo lường 16-bit tự động thay đổi theo Loại Cảm Biến (Sensor Type ở 0x0003). Chi tiết xem tại Mục 5.
+                    </td>
+                </tr>
+                <tr>
+                    <td><code>0x0001</code></td>
+                    <td><strong>Operating Hours</strong></td>
+                    <td><span class="badge write">Read / Write</span></td>
+                    <td>Tổng số giờ hoạt động (0 - 65535 giờ). Được lưu vào EEPROM không mất khi cúp điện. Master có quyền ghi <code>0x0000</code> để xóa bộ đếm sau khi bảo dưỡng định kỳ.</td>
+                </tr>
+                <tr>
+                    <td><code>0x0002</code></td>
+                    <td><strong>Modbus ID</strong></td>
+                    <td><span class="badge write">Read / Write</span></td>
+                    <td>Địa chỉ thiết bị (ID) trên mạng RS-485. Phạm vi hợp lệ: <code>1</code> - <code>247</code>. Dữ liệu chỉ nằm ở Low Byte. Giá trị mặc định xem Mục 6.</td>
+                </tr>
+                <tr>
+                    <td><code>0x0003</code></td>
+                    <td><strong>Sensor Type</strong></td>
+                    <td><span class="badge otp">OTP</span></td>
+                    <td>Cấu hình phần cứng (Phạm vi <code>1</code> - <code>5</code>). Thanh ghi chỉ cho phép ghi một lần (One-Time Programmable). Các lần ghi tiếp theo sẽ bị từ chối ở cấp độ phần cứng.</td>
+                </tr>
+                <tr>
+                    <td><code>0x0004</code></td>
+                    <td><strong>Serial Number H</strong></td>
+                    <td><span class="badge otp">OTP</span></td>
+                    <td>Nửa Cao (High Word) 16-bit của Mã ngày tháng sản xuất (Epoch Time 32-bit). Chỉ ghi 1 lần.</td>
+                </tr>
+                <tr>
+                    <td><code>0x0005</code></td>
+                    <td><strong>Serial Number L</strong></td>
+                    <td><span class="badge otp">OTP</span></td>
+                    <td>Nửa Thấp (Low Word) 16-bit của Mã ngày tháng sản xuất (Epoch Time 32-bit). Chỉ ghi 1 lần.</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2>5. CẤU TRÚC KIỂU DỮ LIỆU ĐO (RAW DATA FORMAT) TẠI REG 0x0000</h2>
+        <p>Giá trị trả về tại thanh ghi <code>0x0000</code> là một số nguyên 16-bit không dấu (Unsigned Integer 16-bit). Ý nghĩa vật lý của giá trị này hoàn toàn phụ thuộc vào cấu hình tại thanh ghi Sensor Type (<code>0x0003</code>).</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Loại Cảm Biến (Type)</th>
+                    <th>Định dạng Dữ liệu (Raw Data Format)</th>
+                    <th>Đơn vị tính</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Type 1</strong> (Nhiệt độ)</td>
+                    <td>Giá trị ADC 12-bit (0 - 4095). Master cần áp dụng hệ số chuyển đổi điện áp thành nhiệt độ.</td>
+                    <td>ADC LSB</td>
+                </tr>
+                <tr>
+                    <td><strong>Type 2</strong> (Vòng tua)</td>
+                    <td>Tần số xung đếm được trong chu kỳ 1 giây. Dữ liệu tự động làm mới sau mỗi giây.</td>
+                    <td>Hz (Xung/giây)</td>
+                </tr>
+                <tr>
+                    <td><strong>Type 3</strong> (Áp suất)</td>
+                    <td>Giá trị ADC 12-bit (0 - 4095). Tương tự Cảm biến Nhiệt độ.</td>
+                    <td>ADC LSB</td>
+                </tr>
+                <tr>
+                    <td><strong>Type 4</strong> (Lưu lượng Vào)</td>
+                    <td>Tổng số xung tích lũy (Accumulator/Totalizer) từ khi bật nguồn (0 - 65535). Không tự động reset.<br>Master tính lưu lượng bằng cách: <code>Δ(Xung) = Xung(t) - Xung(t-1)</code>. Chú ý xử lý toán học hiện tượng tràn số (Overflow 65535 &rarr; 0).</td>
+                    <td>Tổng Xung (Pulses)</td>
+                </tr>
+                <tr>
+                    <td><strong>Type 5</strong> (Lưu lượng Ra)</td>
+                    <td>Hoạt động tương tự Type 4 (Lưu lượng Vào).</td>
+                    <td>Tổng Xung (Pulses)</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section>
+        <h2>6. DANH SÁCH THIẾT BỊ MẶC ĐỊNH (FACTORY DEFAULTS)</h2>
+        <p>Hệ thống mặc định xuất xưởng 5 loại thiết bị đã được nạp sẵn Firmware và cấu hình cứng (OTP) theo dải địa chỉ sau. Master lập trình cấu hình Pooling List dựa theo danh sách này:</p>
+        <ul>
+            <li><strong>Modbus ID 101:</strong> Type 1 (Nhiệt độ)</li>
+            <li><strong>Modbus ID 102:</strong> Type 2 (Vòng tua)</li>
+            <li><strong>Modbus ID 103:</strong> Type 3 (Áp suất)</li>
+            <li><strong>Modbus ID 104:</strong> Type 4 (Lưu lượng Vào)</li>
+            <li><strong>Modbus ID 105:</strong> Type 5 (Lưu lượng Ra)</li>
+        </ul>
+    </section>
+
+    <div class="footer">
+        &copy; 2026 SmartRF. Confidential Document.
+    </div>
+</div>
+
+</body>
+</html>

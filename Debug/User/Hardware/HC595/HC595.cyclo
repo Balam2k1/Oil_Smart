@@ -1,0 +1,11 @@
+../User/Hardware/HC595/HC595.c:7:6:HC595_SendByte	2
+../User/Hardware/HC595/HC595.c:24:6:HC595_SendBytes	2
+../User/Hardware/HC595/HC595.c:32:6:HC595_Latch	1
+../User/Hardware/HC595/HC595.c:39:6:HC595_Display	1
+../User/Hardware/HC595/HC595.c:45:6:HC595_Init	1
+../User/Hardware/HC595/HC595.c:49:6:Fan	5
+../User/Hardware/HC595/HC595.c:76:6:HC595_UpdateFan	5
+../User/Hardware/HC595/HC595.c:98:6:Led_wifi	2
+../User/Hardware/HC595/HC595.c:110:6:Led_warning	2
+../User/Hardware/HC595/HC595.c:122:6:Led_maintain	2
+../User/Hardware/HC595/HC595.c:134:6:Test_Full_Led	1

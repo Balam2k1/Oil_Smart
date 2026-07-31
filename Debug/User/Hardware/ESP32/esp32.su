@@ -1,0 +1,8 @@
+../Drivers/CMSIS/Include/core_cm0.h:856:34:__NVIC_SystemReset	8	static,ignoring_inline_asm
+../User/Hardware/ESP32/esp32.c:49:6:ESP32_Init	24	static
+../User/Hardware/ESP32/esp32.c:66:6:ESP32_Reset	8	static
+../User/Hardware/ESP32/esp32.c:73:6:ESP32_UART_Callback	8	static
+../User/Hardware/ESP32/esp32.c:81:6:ESP32_Send_Packet	160	static
+../User/Hardware/ESP32/esp32.c:99:6:ESP32_RestartReceive	8	static
+../User/Hardware/ESP32/esp32.c:104:13:ESP32_Process_Command	264	static
+../User/Hardware/ESP32/esp32.c:662:6:ESP32_Task	16	static

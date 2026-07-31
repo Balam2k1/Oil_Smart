@@ -1,0 +1,8 @@
+../Drivers/CMSIS/Include/core_cm0.h:856:34:__NVIC_SystemReset	1
+../User/Hardware/ESP32/esp32.c:49:6:ESP32_Init	2
+../User/Hardware/ESP32/esp32.c:66:6:ESP32_Reset	1
+../User/Hardware/ESP32/esp32.c:73:6:ESP32_UART_Callback	2
+../User/Hardware/ESP32/esp32.c:81:6:ESP32_Send_Packet	2
+../User/Hardware/ESP32/esp32.c:99:6:ESP32_RestartReceive	1
+../User/Hardware/ESP32/esp32.c:104:13:ESP32_Process_Command	73
+../User/Hardware/ESP32/esp32.c:662:6:ESP32_Task	40

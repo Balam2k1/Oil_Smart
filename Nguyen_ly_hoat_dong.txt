@@ -1,0 +1,24 @@
+TÀI LIỆU NGUYÊN LÝ HOẠT ĐỘNG - HỆ THỐNG GIÁM SÁT ĐỘNG CƠ TACHO_V1_3
+
+1. TỔNG QUAN HỆ THỐNG
+TACHO_V1_3 là hệ thống nhúng trung tâm (dựa trên vi điều khiển STM32), được thiết kế để thu thập, giám sát, cảnh báo và lưu trữ các thông số vận hành cốt lõi của động cơ (như tàu thủy, máy nổ công nghiệp). Hệ thống cung cấp khả năng lưu trữ nhật ký dài hạn trên Flash ngoại, hiển thị trực quan thông số tại chỗ qua cụm LED 7 thanh và giao tiếp với module ESP32 (qua UART) để phục vụ giám sát IoT từ xa.
+
+2. CƠ CHẾ THU THẬP DỮ LIỆU (ĐẦU VÀO)
+Hệ thống theo dõi 5 thông số cảm biến chính: Điện áp (Vin), Nhiệt độ (Temp), Áp suất (PA), Lưu lượng dầu (Oil) và Vòng tua máy (RPM).
+- Cơ chế Plug & Play (Ưu tiên Modbus): Mỗi giây, STM32 kiểm tra đường truyền RS485. Nếu có cảm biến kỹ thuật số Modbus đang kết nối, hệ thống sẽ ưu tiên lấy số liệu (và số giờ chạy nội tại) của cảm biến Modbus đó.
+- Cảm biến cơ (Local ADC/Timer): Nếu cảm biến Modbus mất kết nối, hệ thống tự động chuyển sang đọc tín hiệu điện áp từ các chân ADC nội (cho Nhiệt độ, Áp suất, Vin) và đếm xung ngắt Timer/EXTI (cho RPM và Lưu lượng dầu).
+- Định vị & Thời gian (GPS): Module GPS cung cấp tọa độ (Vĩ độ, Kinh độ) và thời gian chuẩn quốc tế. Tín hiệu này dùng để tự động đồng bộ cho chip đồng hồ thời gian thực RTC DS1307 trên mạch, đảm bảo mốc thời gian hệ thống (Chuẩn Unix Timestamp 1970) luôn chính xác kể cả khi ngắt điện.
+
+3. XỬ LÝ LƯU TRỮ VÀ NHẬT KÝ (DATA LOGGING)
+Tất cả cấu hình hệ thống và nhật ký vận hành được lưu an toàn trong chip nhớ Winbond 25Q32 (4MB Flash):
+- Bộ đếm thời gian chạy (Run Time): Khi động cơ hoạt động (vòng tua RPM > 0), hệ thống đếm thời gian và cộng dồn vào "Tổng thời gian trọn đời" (Total Time), "Thời gian từ lần bảo dưỡng trước" (Run Time) của động cơ, cũng như tăng số giờ chạy độc lập cho từng cảm biến.
+- Nhật ký vận hành (Flash Log): Một bản ghi (Data Record) nén gọn 32-bytes chứa đầy đủ thông số (Volt, Temp, RPM, Tọa độ, Thời gian, Lượng dầu tiêu thụ...) sẽ tự động lưu vào Flash theo chu kỳ thời gian (mặc định mỗi 3600 giây - có thể tinh chỉnh qua lệnh).
+
+4. CƠ CHẾ CẢNH BÁO (ALARM & BẢO DƯỠNG)
+- Cảnh báo tức thời (Hardware Alarms): STM32 liên tục so sánh chỉ số thực tế với các ngưỡng giới hạn cao/thấp (Max Temp, Max RPM, Min/Max Volt...). Nếu thông số vượt ngưỡng, hệ thống lập tức kích hoạt còi (Buzzer) và đóng Relay bảo vệ động cơ.
+- Cảnh báo bảo dưỡng (Maintenance Alarms): Khi thời gian chạy của hệ thống hoặc của 5 cảm biến vượt qua giới hạn bảo dưỡng đã cài đặt trước đó, hệ thống sẽ chốt trạng thái báo hạn bảo trì.
+- Trực quan hóa (Hiển thị LED): Màn hình LED 7 thanh (điều khiển bởi MAX7219) luân phiên hiển thị các thông số theo chu kỳ. Nếu một cảm biến chạm mốc cần bảo dưỡng, số liệu của cảm biến đó trên màn hình sẽ nhấp nháy liên tục để thu hút sự chú ý của kỹ thuật viên.
+
+5. GIAO TIẾP MỞ RỘNG (GIAO THỨC ESP32)
+- Ở cấp độ phần cứng, STM32 đóng vai trò là Slave, giao tiếp với ESP32 (Master) qua chuẩn UART bằng một bộ giao thức mã hóa nhị phân (Binary Protocol) tốc độ cao.
+- Trạm thu phát ESP32 hoàn toàn có thể kiểm soát hệ thống: Gửi lệnh đọc thông số thời gian thực liên tục (Lệnh 0xD2), đọc lại các bản ghi nhật ký trong quá khứ để vẽ biểu đồ (Lệnh 0xD1), reset số giờ chạy (Lệnh 0xDD, 0xCC), cài đặt các ngưỡng cảnh báo và chu kỳ lấy mẫu, cũng như điều khiển tắt/bật còi báo động từ xa qua đám mây.

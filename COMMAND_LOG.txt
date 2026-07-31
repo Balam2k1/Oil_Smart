@@ -1,0 +1,98 @@
+================================================================================
+BẢNG TỔNG HỢP CÁC LỆNH GIAO TIẾP QUA CỔNG LOG (UART4) - TACHO_V1_3
+================================================================================
+
+1. SENSOR_LOG_ON
+--------------------------------------------------------------------------------
+   - Tính năng: Bật chế độ tự động in log dữ liệu cảm biến ra màn hình theo chu kỳ.
+   - Lưu ý: Sử dụng khi muốn theo dõi trực tiếp các thông số đang đọc được.
+
+2. SENSOR_LOG_OFF
+--------------------------------------------------------------------------------
+   - Tính năng: Tắt chế độ tự động in log cảm biến.
+   - Lưu ý: Giúp màn hình Log đỡ bị trôi, sạch sẽ hơn để dễ gõ các lệnh khác.
+
+3. ESP_LOG_ON
+--------------------------------------------------------------------------------
+   - Tính năng: Bật log hiển thị quá trình giao tiếp AT Command với module ESP32.
+   - Lưu ý: Dùng để debug lỗi mạng, lỗi truyền nhận server với ESP32.
+
+4. ESP_LOG_OFF
+--------------------------------------------------------------------------------
+   - Tính năng: Tắt log giao tiếp với mạch ESP32.
+   - Lưu ý: Tắt đi để đỡ rối mắt khi mạch mạng hoạt động bình thường.
+
+5. ERASE_FLASH
+--------------------------------------------------------------------------------
+   - Tính năng: Xóa trắng toàn bộ IC nhớ W25Q32 (Xóa hết mọi bản tin cũ). Đồng thời MCU sẽ Reboot để khôi phục các hệ số (Limit) về mức mặc định ban đầu.
+   - Lưu ý: Mất khoảng vài giây để xóa. Hệ thống sẽ Tự khởi động lại (Reboot) sau khi xóa xong.
+
+6. COUNT_FLASH
+--------------------------------------------------------------------------------
+   - Tính năng: Trả về tổng số lượng bản tin (Record) hiện đang lưu trong bộ nhớ Flash.
+   - Lưu ý: Lệnh thực thi ngay lập tức.
+
+7. READ_FLASH
+--------------------------------------------------------------------------------
+   - Tính năng: Đọc và in ra màn hình toàn bộ các bản tin từ số 1 cho đến bản tin cuối cùng đang có trong Flash.
+   - Lưu ý: Dữ liệu nhả ra từng dòng một, có độ trễ nhỏ (10ms) để phần mềm PC của bạn không bị tràn bộ đệm.
+
+8. READ_REC_X (Ví dụ: READ_REC_5)
+--------------------------------------------------------------------------------
+   - Tính năng: Đọc và in ra màn hình nội dung của đúng 1 bản tin có số thứ tự là X.
+   - Lưu ý: Cú pháp đọc thông minh, hệ thống tự nhận diện lệnh đọc sau khi chờ 50ms (không yêu cầu nhập kí tự chấm kết thúc, hay Enter dấu cách).
+
+9. SET_MAINT_X (Ví dụ: SET_MAINT_2000)
+--------------------------------------------------------------------------------
+   - Tính năng: Cài đặt mốc thời gian cảnh báo bảo dưỡng động cơ thành X giờ.
+   - Lưu ý: Cài đặt sẽ được lưu vĩnh viễn vào bộ nhớ Flash. Mặc định là 5000 giờ.
+
+10. GET_RUNTIME
+--------------------------------------------------------------------------------
+   - Tính năng: Xem thông tin tổng số giờ động cơ đã chạy, số giây chạy tạm thời của phiên hiện tại, và mốc cảnh báo bảo dưỡng.
+   - Lưu ý: Lệnh thực thi và hiển thị ngay lập tức.
+
+11. SET_RUNTIME_X (Ví dụ: SET_RUNTIME_0)
+--------------------------------------------------------------------------------
+   - Tính năng: Ghi đè (Set) tổng số giờ động cơ đã chạy thành X giờ (Reset về 0 hoặc số bất kỳ).
+   - Lưu ý: Lệnh này thường dùng để Reset giờ khi thay động cơ mới, hoặc ghi đè sau khi thay Flash mới. Sẽ xóa số giây đang chạy dở về 0.
+
+12. SET_LED_INTENSITY_X (Ví dụ: SET_LED_INTENSITY_8)
+--------------------------------------------------------------------------------
+   - Tính năng: Điều chỉnh dòng điện (độ sáng) xuất ra cho các LED 7 thanh / ma trận của IC MAX7219. Giá trị X từ 0 (tối nhất) đến 15 (sáng nhất).
+   - Lưu ý: Chỉnh mức dòng điện thấp (khoảng 5 đến 8) sẽ giúp LED bớt nóng và tăng tuổi thọ đáng kể. Cài đặt được lưu vĩnh viễn vào Flash. Mặc định là 8.
+
+13. SET_BUZZER_X (Ví dụ: SET_BUZZER_0)
+--------------------------------------------------------------------------------
+   - Tính năng: Bật/Tắt còi báo động (Mute). 
+   - Cách dùng:
+     + Gõ `SET_BUZZER_0` -> Tắt tiếng còi (Mute), còi sẽ không kêu nữa dù có báo động.
+     + Gõ `SET_BUZZER_1` -> Bật lại tiếng còi (Unmute - mặc định).
+
+14. GET_LIMITS
+--------------------------------------------------------------------------------
+   - Tính năng: Hiển thị toàn bộ các hằng số và giới hạn cài đặt trong hệ thống (Temp, Vin, PA, Tacho, Oil, Maintenance Time).
+   - Cách dùng: Gõ `GET_LIMITS`
+
+15. GET_VERSION
+--------------------------------------------------------------------------------
+   - Tính năng: Hiển thị phiên bản Firmware đang chạy được lưu trong Flash (Ví dụ: 100 tương đương v1.0.0).
+   - Cách dùng: Gõ `GET_VERSION`
+
+16. GPS_LOG_ON / GPS_LOG_OFF
+--------------------------------------------------------------------------------
+   - Tính năng: Bật / Tắt chế độ hiển thị log toạ độ GPS và trạng thái RTC.
+   - Cách dùng: Gõ `GPS_LOG_ON` hoặc `GPS_LOG_OFF`.
+
+17. FLASH_LOG_ON / FLASH_LOG_OFF
+--------------------------------------------------------------------------------
+   - Tính năng: Bật / Tắt chế độ hiển thị log mỗi khi gói tin dữ liệu được lưu vào Flash.
+   - Cách dùng: Gõ `FLASH_LOG_ON` hoặc `FLASH_LOG_OFF`.
+   - Lưu ý: Giúp chống ồn khi không cần thiết. Trạng thái được lưu vĩnh viễn vào Flash. Mặc định là bật (1).
+
+18. SET_SENS_MAINT_X_Y (Ví dụ: SET_SENS_MAINT_1_5000)
+--------------------------------------------------------------------------------
+   - Tính năng: Cài đặt mốc thời gian cảnh báo bảo dưỡng riêng biệt cho cảm biến X thành Y giờ.
+   - Cách dùng: Gõ `SET_SENS_MAINT_<ID Cảm biến>_<Số Giờ>`.
+     + ID từ 1 đến 5 tương ứng: 1(Nhiệt độ), 2(Vòng tua), 3(Áp suất), 4(Dầu vào), 5(Dầu ra).
+   - Lưu ý: Cài đặt sẽ được lưu vĩnh viễn vào bộ nhớ Flash. Mặc định là 10000 giờ. Nếu cảm biến chạy quá số giờ này, LED báo động sẽ sáng và LED 7 thanh tương ứng sẽ nháy 3 lần khi mới bật máy.

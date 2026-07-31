@@ -1,0 +1,3 @@
+../User/Hardware/Flash/spi.c:4:6:spi_cs_low	8	static
+../User/Hardware/Flash/spi.c:8:6:spi_cs_high	8	static
+../User/Hardware/Flash/spi.c:12:6:SPI_Software_Transmit_Receive	40	static

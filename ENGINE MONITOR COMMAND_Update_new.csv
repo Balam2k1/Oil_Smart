@@ -1,0 +1,41 @@
+﻿ENGINE MONITOR COMMAND,,DESCRIPTION,,,,,,,,,,,,,,,,,,,,,,
+STATUS,OPTIONS,DESCRIPTION,REQUEST,,,,,,,,,,,RESPONSE,,,,,,,,,,
+OK,GET All Threshold  Value,Đọc toàn bộ ngưỡng cảnh báo giới hạn đang lưu,204,E0,503,,,,,,,,,2,E0 0E,XX XX(ADC_MIN),XX XX(ADC_MAX),XX XX(T_MAX),XX XX(PA_MAX),XX XX(OIL_MAX),XX XX(TACHO_MAX),XX XX(TIME_MAINTENANCE),3,
+OK,SET Voltage Min,Cài đặt ngưỡng điện áp cảnh báo Tối thiểu,204,E1,2,XX,XX,503,,,,,,2,E1,1,1,3,,2,E1,1,0,3
+OK,SET Voltage Max,Cài đặt ngưỡng điện áp cảnh báo Tối đa,204,E2,2,XX,XX,503,,,,,,2,E2,1,1,3,,2,E2,1,0,3
+OK,SET Temperature Max,Cài đặt ngưỡng nhiệt độ cảnh báo Tối đa,204,E3,2,XX,XX,503,,,,,,2,E3,1,1,3,,2,E3,1,0,3
+OK,SET Pressure Max,Cài đặt ngưỡng áp suất cảnh báo Tối đa,204,E4,2,XX,XX,503,,,,,,2,E4,1,1,3,,2,E4,1,0,3
+OK,SET Tacho max,Cài đặt vòng tua máy (RPM) cảnh báo Tối đa,204,E5,2,XX,XX,503,,,,,,2,E5,1,1,3,,2,E5,1,0,3
+OK,SET Oil Level Max,Cài đặt mức tiêu hao dầu cảnh báo Tối đa,204,E6,2,XX,XX,503,,,,,,2,E6,1,1,3,,2,E6,1,0,3
+OK,SET Time Maintenace,Cài đặt số giờ chạy máy tới hạn để Bảo dưỡng định kỳ,204,E7,2,XX,XX,503,,,,,,2,E7,1,1,3,,2,E7,1,0,3
+OK,SET Logging Interva,Cài đặt khoảng thời gian (giây) lưu Log dữ liệu,204,E8,4,XX,XX,XX,XX,503,,,,2,E8,1,1,3,,2,E8,1,0,3
+OK,GET Logging Interval,Đọc khoảng thời gian (giây) lưu Log dữ liệu,204,E9,503,,,,,,,,,,2,E9 04,XX XX XX XX(Log_Interval),3,,,,,,
+OK,GET Firmware Version,Đọc phiên bản phần mềm (Firmware Version) hiện tại của STM32,204,EA,503,,,,,,,,,,2,EA 04,XX XX XX XX(Firmware_Version),3,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,
+OK,RESET Threshold,Khôi phục cài đặt gốc của các ngưỡng cảnh báo,204,EF,503,,,,,,,,,2,EF,1,1,3,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,
+OK,"GET Time Sum, Time Run , Count Record",Đọc thời gian chạy máy (Run) / Tổng thời gian (Sum) và Số bản ghi Log,204,D0,503,,,,,,,,,2,D0 06,XX XX(TIME SUM),XX XX(TIME RUN),XX XX(OIL_INDEX),3,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,
+OK,GET  Data Record,Đọc thông số lịch sử đã lưu tại một Index cụ thể,204,D1,2,XX,XX,503,,,,,,2,D1 0F,XX XX(OIL_VALUE),XX XX(VOLT),XX XX(TEMP),XX XX(PA),XX XX(RPM),XX XX XX XX (TIMES),XX(RECORD_TYPE),3,
+,,,,,,,,,,,,,,,,,,,,,,,,
+OK,GET  Realtime data,Đọc thông số vận hành của máy móc tại thời gian thực,204,D2,503,,,,,,,,,2,D2 10,XX XX(VOLT),XX XX(TEMP),XX XX(PA),XX XX(OIL_VALUE),XX XX(RPM),XX XX(TIME RUN),XX XX(TIME SUM),XX XX(TIME_MAINTENANCE),3
+,,,,,,,,,,,,,,,,,,,,,,,,
+OK,SET Voltage Constant,Cài đặt hệ số bù trừ hiệu chuẩn cho Điện áp,204,D3,2,XX,XX,503,,,,,,2,D3,1,1,3,,2,D3,1,0,3
+OK,SET Temp Constant,Cài đặt hệ số bù trừ hiệu chuẩn cho Nhiệt độ (Mặc định 1000 = 100%),204,D4,2,XX,XX,503,,,,,,2,D4,1,1,3,,2,D4,1,0,3
+OK,SET Pressure Constant,Cài đặt hệ số bù trừ hiệu chuẩn cho Áp suất,204,D5,2,XX,XX,503,,,,,,2,D5,1,1,3,,2,D5,1,0,3
+OK,SET Oil_1 Level Constant,Cài đặt hệ số K đong xung của Cảm biến dầu cấp (IN),204,D6,2,XX,XX,503,,,,,,2,D6,1,1,3,,2,D6,1,0,3
+OK,SET Oil_2 Level Constant,Cài đặt hệ số K đong xung của Cảm biến dầu hồi (OUT),204,D7,2,XX,XX,503,,,,,,2,D7,1,1,3,,2,D7,1,0,3
+OK,GET All Constant,Đọc tất cả các hệ số hiệu chuẩn đang lưu trong máy,204,D8,503,,,,,,,,,2,D8 0A,XX XX(VOLT_CONS),XX XX(TEMP_CONS),XX XX(PA_CONS),XX XX(OIL_1_CONS),XX XX(OIL_2_CONS),3,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,
+OK,Reboot System,Khởi động lại mạch vi điều khiển từ xa,204,DA,503,,,,,,,,,2,DA,1,1,3,,,,,,
+OK,Set Relay/Buzzer State,Điều khiển Bật/Tắt cưỡng bức Còi hoặc Relay từ xa để Test dây,204,DB,2,XX(ID),XX(State),503,,,,,,2,DB,1,1,3,,2,DB,1,0,3
+OK,GET Raw ADC Data,Đọc dữ liệu xung/điện thô nguyên bản của cảm biến để chẩn đoán lỗi đứt dây,204,DC,503,,,,,,,,,2,DC 0A,XX XX(Raw_Vin),XX XX(Raw_Temp),XX XX(Raw_PA),XX XX(Pulse_Oil),XX XX(Pulse_RPM),3,,,,
+OK,Reset Runtime,Reset xóa trắng Thời gian chạy máy (Thực hiện khi bảo dưỡng định kỳ xong),204,DD,503,,,,,,,,,2,DD,1,1,3,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,
+OK,DELETE Flash,Reset máy hoàn toàn và Xóa sổ mọi dữ liệu/log cũ trong Flash,204,DF,503,,,,,,,,,2,DF,1,1,3,,,,,,
+,,,,,,,,,,,,,,,,,,,,,,,,
+OK,SET Time RTC,Cài đặt thời gian cho mạch đồng hồ thời gian thực (RTC),204,B1,7,XX(Hour),XX(Min),XX(sec),XX(Day),XX(Date),XX(Month),XX(Year),503,2,B1,1,1,3,,2,B1,1,0,3
+OK,GET Time RTC,Đọc thời gian hiện tại của mạch đồng hồ thời gian thực (RTC),204,B2,503,,,,,,,,,2,B2 06,XX(Hour),XX(Min),XX(sec),XX(Date),XX(Month),XX(Year),3,,
+,,,,,,,,,,,,,,,,,,,,,,,,
+,PING Stm32,Kiểm tra kết nối sống (Ping/Pong) tới mạch STM32,204,B0,503,,,,,,,,,2,B2 04,XX XX XX XX(Time STM32),3,,,,,,,
+SET_SENS_MAINT_X_Y,SET_SENS_MAINT_1_5000,Cài đặt mốc thời gian cảnh báo bảo dưỡng riêng biệt cho cảm biến X thành Y giờ (ID 1-5).,"Lưu Flash vĩnh viễn, mặc định 10000. Nếu quá hạn LED bảo dưỡng sáng và nháy 3 lần khi bật máy."

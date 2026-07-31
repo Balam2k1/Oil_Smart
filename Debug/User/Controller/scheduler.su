@@ -1,0 +1,2 @@
+../User/Controller/scheduler.c:13:6:Scheduler_Init	32	static
+../User/Controller/scheduler.c:86:6:Scheduler_Run	16	static

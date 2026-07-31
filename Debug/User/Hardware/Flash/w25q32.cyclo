@@ -1,0 +1,16 @@
+../User/Hardware/Flash/w25q32.c:6:9:Flash_ReadStatusReg	1
+../User/Hardware/Flash/w25q32.c:17:6:Flash_Write_Enable	3
+../User/Hardware/Flash/w25q32.c:27:6:Flash_Write_Disable	1
+../User/Hardware/Flash/w25q32.c:35:6:W_Flash_Write_Byte	3
+../User/Hardware/Flash/w25q32.c:49:9:W_Flash_Read_Byte	1
+../User/Hardware/Flash/w25q32.c:60:6:W_Flash_Sector_Erase	3
+../User/Hardware/Flash/w25q32.c:72:6:W_Flash_Page_Erase	1
+../User/Hardware/Flash/w25q32.c:76:6:W_Flash_Chip_Erase	3
+../User/Hardware/Flash/w25q32.c:88:6:W_Flash_Write_Arr	3
+../User/Hardware/Flash/w25q32.c:99:6:W_Flash_Write_Int	1
+../User/Hardware/Flash/w25q32.c:109:6:W_Flash_Write_Long	1
+../User/Hardware/Flash/w25q32.c:125:6:W_Flash_Read_Arr	2
+../User/Hardware/Flash/w25q32.c:134:10:W_Flash_Read_Int	1
+../User/Hardware/Flash/w25q32.c:145:10:W_Flash_Read_Long	1
+../User/Hardware/Flash/w25q32.c:163:6:W_Flash_Safe_Write_Int	1
+../User/Hardware/Flash/w25q32.c:177:6:W_Flash_Safe_Write_Long	1
