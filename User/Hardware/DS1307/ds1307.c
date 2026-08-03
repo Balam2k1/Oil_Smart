@@ -16,7 +16,7 @@ void DS1307_Init(void) {
     // Hardware I2C is initialized in MX_I2C2_Init() which is called in main.c
 }
 
-void DS1307_SetTime(DS1307_Time *time) {
+bool DS1307_SetTime(DS1307_Time *time) {
     uint8_t data[7];
     data[0] = dec_to_bcd(time->sec);
     data[1] = dec_to_bcd(time->min);
@@ -26,28 +26,30 @@ void DS1307_SetTime(DS1307_Time *time) {
     data[5] = dec_to_bcd(time->month);
     data[6] = dec_to_bcd(time->year);
     
-    HAL_I2C_Mem_Write(DS1307_I2C_PORT, DS1307_ADDRESS, 0x00, I2C_MEMADD_SIZE_8BIT, data, 7, 1000);
+    return (HAL_I2C_Mem_Write(DS1307_I2C_PORT, DS1307_ADDRESS, 0x00, I2C_MEMADD_SIZE_8BIT, data, 7, 1000) == HAL_OK);
 }
 
-void DS3231_SetTime(DS1307_Time *time) {
-    DS1307_SetTime(time);
+bool DS3231_SetTime(DS1307_Time *time) {
+    return DS1307_SetTime(time);
 }
 
-void DS1307_GetTime(DS1307_Time *time) {
+bool DS1307_GetTime(DS1307_Time *time) {
     uint8_t data[7] = {0};
-    HAL_I2C_Mem_Read(DS1307_I2C_PORT, DS1307_ADDRESS, 0x00, I2C_MEMADD_SIZE_8BIT, data, 7, 1000);
-    
-    time->sec   = bcd_to_dec(data[0] & 0x7F);
-    time->min   = bcd_to_dec(data[1]);
-    time->hour  = bcd_to_dec(data[2] & 0x3F);
-    time->day   = bcd_to_dec(data[3]);
-    time->date  = bcd_to_dec(data[4]);
-    time->month = bcd_to_dec(data[5]);
-    time->year  = bcd_to_dec(data[6]);
+    if (HAL_I2C_Mem_Read(DS1307_I2C_PORT, DS1307_ADDRESS, 0x00, I2C_MEMADD_SIZE_8BIT, data, 7, 1000) == HAL_OK) {
+        time->sec   = bcd_to_dec(data[0] & 0x7F);
+        time->min   = bcd_to_dec(data[1]);
+        time->hour  = bcd_to_dec(data[2] & 0x3F);
+        time->day   = bcd_to_dec(data[3] & 0x07);
+        time->date  = bcd_to_dec(data[4] & 0x3F);
+        time->month = bcd_to_dec(data[5] & 0x1F); // Mask century bit for DS3231 compatibility
+        time->year  = bcd_to_dec(data[6]);
+        return true;
+    }
+    return false;
 }
 
-void DS3231_GetTime(DS1307_Time *time) {
-    DS1307_GetTime(time);
+bool DS3231_GetTime(DS1307_Time *time) {
+    return DS1307_GetTime(time);
 }
 
 void DS1307_Start(void) {

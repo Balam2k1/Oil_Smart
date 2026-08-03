@@ -11,7 +11,7 @@
 #include <string.h>
 #include "buzzer.h"
 #include "Exti_Counter.h"
-
+#include "ds1307.h"
 #define ESP_RX_BUFFER_SIZE 256
 static uint8_t esp_rx_buf[ESP_RX_BUFFER_SIZE];
 static uint16_t esp_rx_head = 0;
@@ -363,8 +363,17 @@ static void ESP32_Process_Command(uint8_t cmd, uint8_t *data, uint8_t len)
         {
             if (len >= 7) {
                 uint8_t h = data[0], m = data[1], s = data[2];
-                uint8_t y = data[6], mo = data[5], dt = data[4];
-                gSystemUnixTime = DateTimeToUnix(y, mo, dt, h, m, s);
+                uint8_t day = data[3];
+                uint8_t dt = data[4], mo = data[5], y = data[6];
+                
+                DS1307_Time t;
+                t.hour = h; t.min = m; t.sec = s;
+                t.day = (day == 0) ? 1 : day; // Prevent day 0
+                t.date = dt; t.month = mo; t.year = y % 100;
+                if (DS1307_SetTime(&t)) {
+                    gSystemUnixTime = DateTimeToUnix(y, mo, dt, h, m, s);
+                }
+                
                 tx_data[0] = 0x01; tx_data[1] = 0x01;
                 ESP32_Send_Packet(0xB1, 2, tx_data);
             }
@@ -373,8 +382,18 @@ static void ESP32_Process_Command(uint8_t cmd, uint8_t *data, uint8_t len)
 
         case 0xB2: /* Get Time RTC */
         {
-            memset(tx_data, 0, 6); // Mock response
-            ESP32_Send_Packet(0xB2, 6, tx_data);
+            DS1307_Time t = {0};
+            DS1307_GetTime(&t); // Lấy giờ thực tế từ phần cứng
+            
+            tx_data[0] = t.hour;
+            tx_data[1] = t.min;
+            tx_data[2] = t.sec;
+            tx_data[3] = t.day;
+            tx_data[4] = t.date;
+            tx_data[5] = t.month;
+            tx_data[6] = t.year; // Trả về dạng 2 số (0-99)
+            
+            ESP32_Send_Packet(0xB2, 7, tx_data);
             break;
         }
 

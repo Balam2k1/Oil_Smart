@@ -429,17 +429,22 @@ void SensorManager_Task(void)
         }
         
         /* Đọc thời gian từ DS1307 */
-        DS1307_Time ds_time;
-        DS1307_GetTime(&ds_time);
-        uint32_t t = DateTimeToUnix(ds_time.year, ds_time.month, ds_time.date, ds_time.hour, ds_time.min, ds_time.sec);
-        if (t >= 1782864000) { // Chỉ nhận thời gian hợp lệ (Từ 01/07/2026 trở lên)
-            gSystemUnixTime = t;
-        }
-        
-        if (GPS_LogEnable) {
-            LOG_Printf("--- RTC: %02u:%02u:%02u %02u/%02u/%02u (Unix: %u) ---\r\n", 
-                       ds_time.hour, ds_time.min, ds_time.sec, 
-                       ds_time.date, ds_time.month, ds_time.year, gSystemUnixTime);
+        DS1307_Time ds_time = {0};
+        if (DS1307_GetTime(&ds_time)) {
+            uint32_t t = DateTimeToUnix(ds_time.year, ds_time.month, ds_time.date, ds_time.hour, ds_time.min, ds_time.sec);
+            if (t >= 1782864000) { // Chỉ nhận thời gian hợp lệ (Từ 01/07/2026 trở lên)
+                gSystemUnixTime = t;
+            }
+            
+            if (GPS_LogEnable) {
+                LOG_Printf("--- RTC: %02u:%02u:%02u %02u/%02u/%02u (Unix: %u) ---\r\n", 
+                           ds_time.hour, ds_time.min, ds_time.sec, 
+                           ds_time.date, ds_time.month, ds_time.year, gSystemUnixTime);
+            }
+        } else {
+            if (GPS_LogEnable) {
+                LOG_Printf("--- RTC: Failed to read from DS1307/DS3231 ---\r\n");
+            }
         }
         
         /* Tắt LED GPS khi mất sóng */

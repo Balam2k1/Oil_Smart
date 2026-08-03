@@ -2,6 +2,7 @@
 #define DS1307_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define DS1307_ADDRESS 0xD0
 
@@ -16,11 +17,11 @@ typedef struct {
 } DS1307_Time;
 
 void DS1307_Init(void);
-void DS1307_SetTime(DS1307_Time *time);
-void DS1307_GetTime(DS1307_Time *time);
+bool DS1307_SetTime(DS1307_Time *time);
+bool DS1307_GetTime(DS1307_Time *time);
 
-void DS3231_SetTime(DS1307_Time *time);
-void DS3231_GetTime(DS1307_Time *time);
+bool DS3231_SetTime(DS1307_Time *time);
+bool DS3231_GetTime(DS1307_Time *time);
 
 void DS1307_Start(void);
 void DS1307_Stop(void);

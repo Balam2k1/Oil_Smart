@@ -18,4 +18,4 @@
 ../User/Application/SensorManager/sensor_manager.c:236:6:SensorManager_Test	2
 ../User/Application/SensorManager/sensor_manager.c:249:6:SensorManager_Test_PA_Vin	2
 ../User/Application/SensorManager/sensor_manager.c:273:6:SensorManager_Update	1
-../User/Application/SensorManager/sensor_manager.c:312:6:SensorManager_Task	57
+../User/Application/SensorManager/sensor_manager.c:312:6:SensorManager_Task	59

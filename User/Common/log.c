@@ -286,6 +286,32 @@ void LOG_Task(void)
             LOG_Printf("Current Session (Unsaved): %u seconds\r\n", gEngineRunSeconds);
             LOG_Printf("Maintenance Limit: %u hours\r\n", Limit_MaintenanceTime);
             LOG_Printf("---------------------------\r\n\n");
+            log_cmd_idx = 0;
+        } else if (strstr(log_cmd_buf, "SET_TIME_") != NULL) {
+            extern void HAL_Delay(uint32_t Delay);
+            HAL_Delay(50);
+            
+            uint32_t d, m, y, h, min, s;
+            if (sscanf(strstr(log_cmd_buf, "SET_TIME_"), "SET_TIME_%lu_%lu_%lu_%lu_%lu_%lu", &d, &m, &y, &h, &min, &s) == 6) {
+                #include "ds1307.h"
+                DS1307_Time t;
+                t.date = (uint8_t)d;
+                t.month = (uint8_t)m;
+                t.year = (uint8_t)(y % 100);
+                t.hour = (uint8_t)h;
+                t.min = (uint8_t)min;
+                t.sec = (uint8_t)s;
+                t.day = 1; // Default
+                
+                if (DS1307_SetTime(&t)) {
+                    LOG_Printf("\r\n--- RTC TIME SET SUCCESSFULLY: %02u/%02u/%02u %02u:%02u:%02u ---\r\n", d, m, y, h, min, s);
+                } else {
+                    LOG_Printf("\r\n--- ERROR: FAILED TO SET RTC TIME ---\r\n");
+                }
+            } else {
+                LOG_Printf("\r\nError: Invalid format. Use SET_TIME_dd_MM_yy_hh_mm_ss\r\n");
+            }
+            log_cmd_idx = 0;
         }
         
         /* Dọn dẹp buffer sau khi xử lý xong */

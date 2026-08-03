@@ -1,7 +1,7 @@
 ../Drivers/CMSIS/Include/core_cm0.h:856:34:__NVIC_SystemReset	1
 ../User/Common/log.c:26:6:LOG_Init	1
 ../User/Common/log.c:34:6:LOG_UART_Callback	4
-../User/Common/log.c:52:6:LOG_Task	37
-../User/Common/log.c:297:6:LOG_RestartReceive	1
-../User/Common/log.c:310:6:LOG_Print	2
-../User/Common/log.c:331:6:LOG_Printf	1
+../User/Common/log.c:52:6:LOG_Task	40
+../User/Common/log.c:323:6:LOG_RestartReceive	1
+../User/Common/log.c:336:6:LOG_Print	2
+../User/Common/log.c:357:6:LOG_Printf	1

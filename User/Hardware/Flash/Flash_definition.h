@@ -30,7 +30,7 @@ KHAI BAO DIA CHI FLASH: 4MB (Winbond 25Q32)
 #define AD_VERSION                      (AD_START_PAGE_2 + 4)     // 4
 #define AD_DEVICE_ID                    (AD_START_PAGE_2 + 8)     // 12 bytes (UID)
 
-#define FIRMWARE_VERSION_VALUE          108   // Version 1.0.8 (107)
+#define FIRMWARE_VERSION_VALUE          109   // Version 1.0.9 (109)
 
 /* Constants in Page 3 */
 #define AD_START_PAGE_3                 4096*3

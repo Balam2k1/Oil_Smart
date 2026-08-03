@@ -47,7 +47,8 @@ User/Common/log.o: ../User/Common/log.c ../User/Common/log.h \
  D:/TASK/TACHO_V1_3/User/Application/DataModel/data_model.h \
  ../User/Common/app_config.h \
  D:/TASK/TACHO_V1_3/User/Hardware/Flash/w25q32.h \
- D:/TASK/TACHO_V1_3/User/Hardware/Flash/Flash_definition.h
+ D:/TASK/TACHO_V1_3/User/Hardware/Flash/Flash_definition.h \
+ D:/TASK/TACHO_V1_3/User/Hardware/DS1307/ds1307.h
 ../User/Common/log.h:
 D:/TASK/TACHO_V1_3/User/Common/app.h:
 ../Core/Inc/main.h:
@@ -101,3 +102,4 @@ D:/TASK/TACHO_V1_3/User/Application/DataModel/data_model.h:
 ../User/Common/app_config.h:
 D:/TASK/TACHO_V1_3/User/Hardware/Flash/w25q32.h:
 D:/TASK/TACHO_V1_3/User/Hardware/Flash/Flash_definition.h:
+D:/TASK/TACHO_V1_3/User/Hardware/DS1307/ds1307.h:

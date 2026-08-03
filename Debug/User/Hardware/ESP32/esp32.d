@@ -50,7 +50,8 @@ User/Hardware/ESP32/esp32.o: ../User/Hardware/ESP32/esp32.c \
  D:/TASK/TACHO_V1_3/User/Application/ModbusMaster/modbus_master.h \
  D:/TASK/TACHO_V1_3/User/Application/SensorManager/sensor_manager.h \
  D:/TASK/TACHO_V1_3/User/Application/DisplayManager/display_manager.h \
- D:/TASK/TACHO_V1_3/User/Hardware/EXTI_Counter/Exti_Counter.h
+ D:/TASK/TACHO_V1_3/User/Hardware/EXTI_Counter/Exti_Counter.h \
+ D:/TASK/TACHO_V1_3/User/Hardware/DS1307/ds1307.h
 ../User/Hardware/ESP32/esp32.h:
 ../Core/Inc/usart.h:
 ../Core/Inc/main.h:
@@ -106,3 +107,4 @@ D:/TASK/TACHO_V1_3/User/Application/ModbusMaster/modbus_master.h:
 D:/TASK/TACHO_V1_3/User/Application/SensorManager/sensor_manager.h:
 D:/TASK/TACHO_V1_3/User/Application/DisplayManager/display_manager.h:
 D:/TASK/TACHO_V1_3/User/Hardware/EXTI_Counter/Exti_Counter.h:
+D:/TASK/TACHO_V1_3/User/Hardware/DS1307/ds1307.h:
