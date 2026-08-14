@@ -1,3 +1,0 @@
-../User/Application/DisplayManager/display_manager.c:7:6:DisplayManager_Init	8	static
-../User/Application/DisplayManager/display_manager.c:17:6:DisplayManager_StartupBlink	40	static
-../User/Application/DisplayManager/display_manager.c:48:6:DisplayManager_Task	16	static

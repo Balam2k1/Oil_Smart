@@ -1,6 +1,0 @@
-../User/Application/ModbusMaster/modbus_master.c:45:10:Modbus_CRC16	24	static
-../User/Application/ModbusMaster/modbus_master.c:78:13:Modbus_SendReadRequest	48	static
-../User/Application/ModbusMaster/modbus_master.c:106:16:Modbus_ParseResponse	48	static
-../User/Application/ModbusMaster/modbus_master.c:176:6:ModbusMaster_Init	16	static
-../User/Application/ModbusMaster/modbus_master.c:199:6:ModbusMaster_Task	8	static
-../User/Application/ModbusMaster/modbus_master.c:284:17:ModbusMaster_GetSensor	16	static

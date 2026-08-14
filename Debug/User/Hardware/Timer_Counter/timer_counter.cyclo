@@ -1,3 +1,0 @@
-../User/Hardware/Timer_Counter/timer_counter.c:15:6:TimerCounter_Init	1
-../User/Hardware/Timer_Counter/timer_counter.c:21:6:HAL_TIM_IC_CaptureCallback	9
-../User/Hardware/Timer_Counter/timer_counter.c:63:10:TimerCounter_GetTachoPeriod	2

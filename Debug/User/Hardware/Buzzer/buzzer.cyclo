@@ -1,9 +1,0 @@
-../User/Hardware/Buzzer/buzzer.c:20:6:Buzzer_On	2
-../User/Hardware/Buzzer/buzzer.c:30:6:Buzzer_Off	1
-../User/Hardware/Buzzer/buzzer.c:39:6:Buzzer_Init	3
-../User/Hardware/Buzzer/buzzer.c:57:6:Buzzer_IsMuted	1
-../User/Hardware/Buzzer/buzzer.c:62:6:Buzzer_SetMute	3
-../User/Hardware/Buzzer/buzzer.c:72:6:Buzzer_Toggle	2
-../User/Hardware/Buzzer/buzzer.c:81:6:Buzzer_StartPattern	1
-../User/Hardware/Buzzer/buzzer.c:98:6:Buzzer_StopPattern	1
-../User/Hardware/Buzzer/buzzer.c:108:6:Buzzer_Task	5

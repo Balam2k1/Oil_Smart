@@ -1,2 +1,0 @@
-../User/Hardware/ADC/adc_driver.c:12:6:ADC_Driver_Init	1
-../User/Hardware/ADC/adc_driver.c:21:10:ADC_Read_Channel	4

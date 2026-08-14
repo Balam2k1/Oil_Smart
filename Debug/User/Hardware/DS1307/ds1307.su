@@ -1,9 +1,0 @@
-../User/Hardware/DS1307/ds1307.c:7:16:bcd_to_dec	16	static
-../User/Hardware/DS1307/ds1307.c:11:16:dec_to_bcd	24	static
-../User/Hardware/DS1307/ds1307.c:15:6:DS1307_Init	8	static
-../User/Hardware/DS1307/ds1307.c:19:6:DS1307_SetTime	48	static
-../User/Hardware/DS1307/ds1307.c:32:6:DS3231_SetTime	16	static
-../User/Hardware/DS1307/ds1307.c:36:6:DS1307_GetTime	48	static
-../User/Hardware/DS1307/ds1307.c:51:6:DS3231_GetTime	16	static
-../User/Hardware/DS1307/ds1307.c:55:6:DS1307_Start	32	static
-../User/Hardware/DS1307/ds1307.c:62:6:DS1307_Stop	32	static

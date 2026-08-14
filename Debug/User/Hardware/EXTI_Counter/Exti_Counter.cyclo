@@ -1,7 +1,0 @@
-../User/Hardware/EXTI_Counter/Exti_Counter.c:10:17:get_debounce_ms	6
-../User/Hardware/EXTI_Counter/Exti_Counter.c:40:6:HAL_GPIO_EXTI_Callback	19
-../User/Hardware/EXTI_Counter/Exti_Counter.c:111:6:ExtiCounter_Reset	1
-../User/Hardware/EXTI_Counter/Exti_Counter.c:119:10:ExtiCounter_GetOil1	1
-../User/Hardware/EXTI_Counter/Exti_Counter.c:124:10:ExtiCounter_GetOil2	1
-../User/Hardware/EXTI_Counter/Exti_Counter.c:129:10:ExtiCounter_GetOil1_Period	5
-../User/Hardware/EXTI_Counter/Exti_Counter.c:149:10:ExtiCounter_GetOil2_Period	5

@@ -1,3 +1,0 @@
-../User/Application/DataModel/data_model.c:35:6:DataModel_Init	112	static
-../User/Application/DataModel/data_model.c:174:10:DateTimeToUnix	64	static
-../User/Application/DataModel/data_model.c:198:6:SystemTime_Update	16	static
