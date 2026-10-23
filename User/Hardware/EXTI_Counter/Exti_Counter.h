@@ -11,7 +11,7 @@ typedef struct {
 /* Reset đếm xung dầu (thường gọi khi đã lưu xong 1 giờ) */
 void ExtiCounter_Reset(void);
 
-/* Khởi động DWT Cycle Counter để debounce (gọi 1 lần khi boot) */
+/* Init debounce (Cortex-M0: no-op; giữ API tương thích) */
 void ExtiCounter_DWT_Init(void);
 
 /* Lấy tổng số xung dầu đi (OIL_1) từ lần reset cuối */

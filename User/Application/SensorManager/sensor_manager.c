@@ -34,7 +34,7 @@ bool FLASH_LogEnable = false;
 
 void SensorManager_Init(void)
 {
-    ExtiCounter_DWT_Init(); /* Bật DWT cycle counter để debounce xung dầu */
+    ExtiCounter_DWT_Init(); /* Debounce init (no-op trên Cortex-M0) */
     ADC_Driver_Init();
     TimerCounter_Init();
     

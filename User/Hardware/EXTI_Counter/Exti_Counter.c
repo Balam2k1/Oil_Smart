@@ -34,32 +34,20 @@ uint16_t FORWARD_BUBBLE_PCT = 0;
 /*===========================================================================
  * EXTI Callback — đếm xung rising edge với software debounce
  *
- * Debounce dùng DWT Cycle Counter (không chiếm timer):
- *   Nếu 2 rising edge cách nhau < DEBOUNCE_US → bỏ qua (nhiễu ringing)
+ * STM32F030 (Cortex-M0) không có DWT/CYCCNT → dùng HAL_GetTick() (1 ms).
+ * Nếu 2 rising edge cách nhau < DEBOUNCE_MS → bỏ qua (nhiễu ringing).
  *
- * Với cảm biến Hall/Turbine: thường >= 5ms giữa 2 xung thực ở lưu lượng cao.
- * Cài DEBOUNCE_US = 2000 (2ms) là an toàn cho hầu hết flow meter.
+ * Cảm biến Hall/Turbine thường >= 5 ms giữa 2 xung thật ở lưu lượng cao.
  *===========================================================================*/
 
-#define DEBOUNCE_US     2000U   /* µs — tăng nếu cảm biến bị nhiễu nhiều hơn */
-#define CPU_MHZ         48U     /* MHz — phải khớp với SystemClock (HSI×6 = 48MHz) */
-#define DEBOUNCE_CYCLES (DEBOUNCE_US * CPU_MHZ)
+#define DEBOUNCE_MS     2U   /* ms — tăng nếu cảm biến bị nhiễu nhiều hơn */
 
-static uint32_t oil1_last_cycle = 0;
-static uint32_t oil2_last_cycle = 0;
+static uint32_t oil1_last_tick = 0;
+static uint32_t oil2_last_tick = 0;
 
-/* Đọc DWT Cycle Counter — không tốn timer phần cứng */
-static inline uint32_t DWT_GetCycles(void)
-{
-    return DWT->CYCCNT;
-}
-
-/* Khởi động DWT nếu chưa bật (gọi 1 lần trong Init) */
+/* Giữ API cũ; Cortex-M0 không cần init phần cứng cho debounce */
 void ExtiCounter_DWT_Init(void)
 {
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    DWT->CYCCNT       = 0;
-    DWT->CTRL        |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
@@ -68,10 +56,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     {
         if (HAL_GPIO_ReadPin(OIL_1_GPIO_Port, OIL_1_Pin) == GPIO_PIN_RESET) return;
 
-        uint32_t now = DWT_GetCycles();
-        if ((now - oil1_last_cycle) >= DEBOUNCE_CYCLES)
+        uint32_t now = HAL_GetTick();
+        if ((now - oil1_last_tick) >= DEBOUNCE_MS)
         {
-            oil1_last_cycle = now;
+            oil1_last_tick = now;
             oil1_total_pulses++;
         }
         /* else: bỏ qua — nhiễu ringing */
@@ -80,10 +68,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     {
         if (HAL_GPIO_ReadPin(OIL_2_GPIO_Port, OIL_2_Pin) == GPIO_PIN_RESET) return;
 
-        uint32_t now = DWT_GetCycles();
-        if ((now - oil2_last_cycle) >= DEBOUNCE_CYCLES)
+        uint32_t now = HAL_GetTick();
+        if ((now - oil2_last_tick) >= DEBOUNCE_MS)
         {
-            oil2_last_cycle = now;
+            oil2_last_tick = now;
             oil2_total_pulses++;
         }
     }
@@ -102,6 +90,8 @@ void ExtiCounter_Reset(void)
     last_oil2_total   = 0;
     last_diff1        = 0;
     last_diff2        = 0;
+    oil1_last_tick    = 0;
+    oil2_last_tick    = 0;
     oil1_total_liters = 0.0;
     oil2_total_liters = 0.0;
     __enable_irq();
