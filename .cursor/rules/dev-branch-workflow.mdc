@@ -1,0 +1,27 @@
+---
+description: Làm việc và commit trên nhánh dev để bảo vệ mã nguồn ổn định
+alwaysApply: true
+---
+
+# Nhánh làm việc: `dev`
+
+Mục tiêu: tránh làm hỏng mã nguồn ổn định. Mọi chỉnh sửa code của agent phải diễn ra trên nhánh `dev`.
+
+## Trước khi sửa code
+
+1. Kiểm tra nhánh hiện tại (`git branch --show-current` hoặc `git status`).
+2. Nếu **không** đang ở `dev`:
+   - Chuyển sang `dev` (`git checkout dev` / `git switch dev`).
+   - Nếu chưa có nhánh `dev`, tạo từ nhánh hiện tại ổn định rồi checkout.
+3. Không commit trực tiếp lên `main` / `master` trừ khi người dùng yêu cầu rõ ràng.
+
+## Commit trên `dev`
+
+- Mọi thay đổi **đã chạy / đã kiểm tra ổn** phải được **commit trên nhánh `dev`**.
+- Không để thay đổi ổn định chỉ nằm uncommitted lâu; sau khi xong và xác nhận chạy được → commit trên `dev`.
+- Thay đổi chưa chạy được / đang thử nghiệm: có thể để uncommitted hoặc commit WIP rõ ràng trên `dev`, **không** merge/`push` phá nhánh ổn định.
+- Vẫn tuân thủ quy trình commit an toàn (message rõ ràng, không `--force` lên main, không amend bừa, không commit secret).
+
+## Khi người dùng yêu cầu merge / PR
+
+- Base mặc định hướng về tích hợp từ `dev`; không đẩy thẳng hotfix vào `main` trừ khi được chỉ định.
