@@ -43,7 +43,13 @@ KHAI BAO DIA CHI FLASH: 4MB (Winbond 25Q32)
 #define AD_SENSOR_ENABLE_MASK           (AD_START_PAGE_3 + 20)    // 2 bytes
 #define AD_SYSTEM_CONTROL_MODE          (AD_START_PAGE_3 + 22)    // 2 bytes
 #define AD_SENSOR_RUNTIME_BASE          (AD_START_PAGE_3 + 30)    // 20 bytes (5 * 4 bytes)
+#define AD_RETURN_BUBBLE_PCT            (AD_START_PAGE_3 + 50)    // 2 bytes
+#define AD_FORWARD_BUBBLE_PCT           (AD_START_PAGE_3 + 52)    // 2 bytes
 
+#define AD_START_PAGE_4                 4096*4
+#define AD_OIL_MA_SIZE                  (AD_START_PAGE_4 + 0)     // 2 bytes
+#define AD_OIL_DEBOUNCE                 (AD_START_PAGE_4 + 2)     // 2 bytes
+#define AD_OIL_CALIB_TABLE              (AD_START_PAGE_4 + 10)    // 40 bytes (10 points * 4 bytes)
 
 #define AD_START_PAGE_5                 4096*5
 #define AD_START_OIL_RECORD             AD_START_PAGE_5           // Dữ liệu bắt đầu từ đây

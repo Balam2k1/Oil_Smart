@@ -114,7 +114,7 @@ void LOG_Task(void)
         } else if (strstr(log_cmd_buf, "GET_VERSION") != NULL) {
             #include "data_model.h"
             LOG_Printf("\r\n--- FIRMWARE INFO ---\r\n");
-            LOG_Printf("Version: %u\r\n", gFirmwareVersion);
+            LOG_Printf("Version: %u\r\n", gSystemData.FirmwareVersion);
             LOG_Printf("---------------------\r\n");
             log_cmd_idx = 0;
         } else if (strstr(log_cmd_buf, "ERASE_FLASH") != NULL) {
@@ -129,18 +129,16 @@ void LOG_Task(void)
             /* Khởi động lại MCU để load cấu hình mặc định vào Flash */
             NVIC_SystemReset();
         } else if (strstr(log_cmd_buf, "COUNT_FLASH") != NULL) {
-            extern uint32_t gRecordCount;
-            LOG_Printf("\r\nTotal Records currently in Flash: %u\r\n", gRecordCount);
+            LOG_Printf("\r\nTotal Records currently in Flash: %u\r\n", gSystemData.RecordCount);
             log_cmd_idx = 0;
         } else if (strstr(log_cmd_buf, "READ_FLASH") != NULL) {
-            extern uint32_t gRecordCount;
-            LOG_Printf("\r\n=== READING FLASH RECORDS (%u) ===\r\n", gRecordCount);
+            LOG_Printf("\r\n=== READING FLASH RECORDS (%u) ===\r\n", gSystemData.RecordCount);
             
             #include "data_model.h"
             #include "Flash_definition.h"
             #include "w25q32.h"
             
-            for (uint32_t i = 0; i < gRecordCount; i++) {
+            for (uint32_t i = 0; i < gSystemData.RecordCount; i++) {
                 DataRecord_t rec;
                 uint32_t addr = AD_START_OIL_RECORD + (i * sizeof(DataRecord_t));
                 W_Flash_Read_Arr(addr, (uint8_t*)&rec, sizeof(DataRecord_t));
@@ -149,7 +147,7 @@ void LOG_Task(void)
                            i+1, 
                            rec.Timestamp, 
                            rec.Latitude, rec.Longitude, 
-                           rec.OilConsumed / 10, rec.OilConsumed % 10,
+                           (uint16_t)(rec.Total_Oil_Consumed / 100), (uint16_t)(rec.Total_Oil_Consumed % 100),
                            rec.Voltage / 10, rec.Voltage % 10, 
                            rec.RPM, 
                            rec.Temperature / 10, rec.Temperature % 10, 
@@ -166,8 +164,7 @@ void LOG_Task(void)
             
             uint32_t idx = 0;
             if (sscanf(strstr(log_cmd_buf, "READ_REC_"), "READ_REC_%lu", &idx) == 1) {
-                extern uint32_t gRecordCount;
-                if (idx > 0 && idx <= gRecordCount) {
+                if (idx > 0 && idx <= gSystemData.RecordCount) {
                     #include "data_model.h"
                     #include "Flash_definition.h"
                     #include "w25q32.h"
@@ -180,21 +177,20 @@ void LOG_Task(void)
                                idx, 
                                rec.Timestamp, 
                                rec.Latitude, rec.Longitude, 
-                               rec.OilConsumed / 10, rec.OilConsumed % 10,
+                               (uint16_t)(rec.Total_Oil_Consumed / 100), (uint16_t)(rec.Total_Oil_Consumed % 100),
                                rec.Voltage / 10, rec.Voltage % 10, 
                                rec.RPM, 
                                rec.Temperature / 10, rec.Temperature % 10, 
                                rec.Pressure / 10, rec.Pressure % 10);
                 } else {
-                    LOG_Printf("\r\nError: Record %lu not found. Total records: %u\r\n", idx, gRecordCount);
+                    LOG_Printf("\r\nError: Record %lu not found. Total records: %u\r\n", idx, gSystemData.RecordCount);
                 }
             }
             log_cmd_idx = 0;
         } else if (strstr(log_cmd_buf, "GET_ID") != NULL) {
-            extern uint8_t gHardwareUID[12];
             LOG_Printf("\r\n--- HARDWARE UID ---\r\n");
             for (int i=0; i<12; i++) {
-                LOG_Printf("%02X", gHardwareUID[i]);
+                LOG_Printf("%02X", gSystemData.HardwareUID[i]);
             }
             LOG_Printf("\r\n--------------------\r\n");
             log_cmd_idx = 0;
@@ -225,12 +221,12 @@ void LOG_Task(void)
                     #include "Flash_definition.h"
                     #include "w25q32.h"
                     
-                    gSensorMaintLimits[id - 1] = (uint16_t)hours;
+                    gConfigData.SensorMaintLimits[id - 1] = (uint16_t)hours;
                     
                     uint8_t maint_buf[10];
                     for(int i=0; i<5; i++) {
-                        maint_buf[i*2] = (gSensorMaintLimits[i] >> 8) & 0xFF;
-                        maint_buf[i*2+1] = gSensorMaintLimits[i] & 0xFF;
+                        maint_buf[i*2] = (gConfigData.SensorMaintLimits[i] >> 8) & 0xFF;
+                        maint_buf[i*2+1] = gConfigData.SensorMaintLimits[i] & 0xFF;
                     }
                     W_Flash_Write_Arr(AD_SENSOR_MAINT_LIMIT_BASE, maint_buf, 10);
                     
@@ -251,7 +247,7 @@ void LOG_Task(void)
                 #include "w25q32.h"
                 
                 gRuntimeData.RunTime = hours;
-                gEngineRunSeconds = 0; /* Reset luôn số giây chạy tạm thời */
+                gRuntimeData.EngineRunSeconds = 0; /* Reset luôn số giây chạy tạm thời */
                 W_Flash_Safe_Write_Long(AD_TIME_RUN, gRuntimeData.RunTime);
                 
                 LOG_Printf("\r\n--- ENGINE RUNTIME OVERWRITTEN: %u hours ---\r\n", gRuntimeData.RunTime);
@@ -283,7 +279,7 @@ void LOG_Task(void)
             extern uint16_t Limit_MaintenanceTime;
             LOG_Printf("\r\n--- ENGINE RUNTIME INFO ---\r\n");
             LOG_Printf("Total Run Time: %u hours\r\n", gRuntimeData.RunTime);
-            LOG_Printf("Current Session (Unsaved): %u seconds\r\n", gEngineRunSeconds);
+            LOG_Printf("Current Session (Unsaved): %u seconds\r\n", gRuntimeData.EngineRunSeconds);
             LOG_Printf("Maintenance Limit: %u hours\r\n", Limit_MaintenanceTime);
             LOG_Printf("---------------------------\r\n\n");
             log_cmd_idx = 0;

@@ -51,61 +51,69 @@ typedef struct
 
 }DataModel_Alarm_t;
 
-/*=========================================================
- * Runtime
- *=========================================================*/
 typedef struct
 {
-    uint32_t RunTime;
+    uint32_t UnixTime;
+    uint32_t FirmwareVersion;
+    uint32_t RecordCount;
+    uint8_t  HardwareUID[12];
+    uint8_t  FlashUID[12];
+    bool     UidMatched;
+} DataModel_System_t;
 
-    uint32_t TotalTime;
+typedef struct
+{
+    uint32_t LogInterval; /* in seconds */
+    uint8_t  ControlMode;
+    uint8_t  SensorEnableMask;
+    uint16_t SensorMaintLimits[5];
+    uint8_t  LedIntensity;
+} DataModel_Config_t;
 
-}DataModel_Runtime_t;
-
-/*=========================================================
- * Data Record (Flash Logging)
- *=========================================================*/
 typedef struct
 {
     int32_t Latitude;
     int32_t Longitude;
-    uint32_t Timestamp;
-    uint16_t OilConsumed;
-    uint16_t Voltage;
-    uint16_t RPM;
-    uint16_t Temperature;
-    uint16_t Pressure;
-    uint8_t RecordType;    /* 0: Periodic log, 1: Startup log */
-    uint32_t EngineRunTime; /* Thoi gian dong co chay trong chu ky log */
-    uint8_t Reserved[5];   /* Pad to 32 bytes */
+} DataModel_Location_t;
+
+typedef struct
+{
+    uint32_t RunTime;
+    uint32_t TotalTime;
+    uint16_t EngineRunSeconds;
+    uint32_t EngineRunSinceLastLog;
+    uint32_t SensorRunTimes[5];
+} DataModel_Runtime_t;
+
+typedef struct
+{
+    int32_t Latitude;           // 4
+    int32_t Longitude;          // 4
+    uint32_t Timestamp;         // 4
+    uint32_t Oil1_TotalPulses;  // 4
+    uint32_t Oil2_TotalPulses;  // 4
+    uint32_t Total_Oil_Consumed;// 4
+    uint16_t Voltage;           // 2
+    uint16_t RPM;               // 2
+    uint16_t Temperature;       // 2
+    uint16_t Pressure;          // 2
+    uint16_t EngineRunTime;     // 2
+    uint8_t RecordType;         // 1
+    uint8_t Padding;            // 1 (explicit alignment)
+    uint32_t Oil1_TotalLiters;  // 4 (Liters * 100)
+    uint32_t Oil2_TotalLiters;  // 4 (Liters * 100)
+    uint8_t Reserved[20];       // 20
 } DataRecord_t;
 
 /*=========================================================
  * Global Data
  *=========================================================*/
-extern DataModel_Sensor_t  gSensorData;
-extern DataModel_Alarm_t   gAlarmData;
-extern DataModel_Runtime_t gRuntimeData;
-
-extern uint32_t gSystemUnixTime;
-extern uint32_t gFirmwareVersion;
-extern uint32_t gRecordCount;
-extern uint32_t gLogInterval; /* in seconds */
-extern uint16_t gEngineRunSeconds;
-extern uint32_t gEngineRunSinceLastLog;
-
-extern int32_t gLastLatitude;
-extern int32_t gLastLongitude;
-
-extern uint8_t gHardwareUID[12];
-extern uint8_t gFlashUID[12];
-extern bool gUidMatched;
-
-extern uint8_t gSystemControlMode;
-extern uint8_t gSensorEnableMask;
-extern uint16_t gSensorMaintLimits[5];
-extern uint32_t gSensorRunTimes[5];
-extern uint8_t gLedIntensity;
+extern DataModel_Sensor_t   gSensorData;
+extern DataModel_Alarm_t    gAlarmData;
+extern DataModel_Runtime_t  gRuntimeData;
+extern DataModel_System_t   gSystemData;
+extern DataModel_Config_t   gConfigData;
+extern DataModel_Location_t gLocationData;
 
 void DataModel_Init(void);
 void SystemTime_Update(void);

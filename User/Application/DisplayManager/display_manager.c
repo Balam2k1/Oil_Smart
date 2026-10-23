@@ -16,11 +16,11 @@ void DisplayManager_Init(void)
 
 void DisplayManager_StartupBlink(void)
 {
-    bool blink_temp = (Sensor_GetOperatingHours(0) >= ((uint32_t)gSensorMaintLimits[0] * 60));
-    bool blink_rpm = (Sensor_GetOperatingHours(1) >= ((uint32_t)gSensorMaintLimits[1] * 60));
-    bool blink_pressure = (Sensor_GetOperatingHours(2) >= ((uint32_t)gSensorMaintLimits[2] * 60));
-    bool blink_oil1 = (Sensor_GetOperatingHours(3) >= ((uint32_t)gSensorMaintLimits[3] * 60));
-    bool blink_oil2 = (Sensor_GetOperatingHours(4) >= ((uint32_t)gSensorMaintLimits[4] * 60));
+    bool blink_temp = (Sensor_GetOperatingHours(0) >= ((uint32_t)gConfigData.SensorMaintLimits[0] * 60));
+    bool blink_rpm = (Sensor_GetOperatingHours(1) >= ((uint32_t)gConfigData.SensorMaintLimits[1] * 60));
+    bool blink_pressure = (Sensor_GetOperatingHours(2) >= ((uint32_t)gConfigData.SensorMaintLimits[2] * 60));
+    bool blink_oil1 = (Sensor_GetOperatingHours(3) >= ((uint32_t)gConfigData.SensorMaintLimits[3] * 60));
+    bool blink_oil2 = (Sensor_GetOperatingHours(4) >= ((uint32_t)gConfigData.SensorMaintLimits[4] * 60));
 
     if (!blink_temp && !blink_rpm && !blink_pressure && !blink_oil1 && !blink_oil2) {
         return; // Không có cảm biến nào quá hạn bảo dưỡng
@@ -81,7 +81,7 @@ void DisplayManager_Task(void)
     
     // Nếu sai UID, nháy 4 LED: GPS, Bảo dưỡng, Cảnh báo, Wifi (ở đây chỉ có LED cảnh báo/bảo dưỡng, Wifi/GPS do mạch khác điều khiển? Để kiểm tra lại)
     // Tạm thời nếu sai UID, nháy LED MAINTAIN và WARNING liên tục.
-    if (!gUidMatched) {
+    if (!gSystemData.UidMatched) {
         HAL_GPIO_WritePin(LED_TEMP_C_GPIO_Port, LED_TEMP_C_Pin, blink_on ? GPIO_PIN_RESET : GPIO_PIN_SET);
         HAL_GPIO_WritePin(LED_PA_C_GPIO_Port, LED_PA_C_Pin, blink_on ? GPIO_PIN_RESET : GPIO_PIN_SET);
         HAL_GPIO_WritePin(LED_OLDC_GPIO_Port, LED_OLDC_Pin, blink_on ? GPIO_PIN_RESET : GPIO_PIN_SET);

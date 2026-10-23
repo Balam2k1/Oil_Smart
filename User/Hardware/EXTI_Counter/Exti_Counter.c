@@ -1,140 +1,267 @@
 #include "Exti_Counter.h"
 #include "main.h"
 #include "app_config.h"
+#include "Flash_definition.h"
 
 extern uint16_t OIL_1_CONS;
 extern uint16_t OIL_2_CONS;
 
-// Tính thời gian lọc nhiễu linh hoạt theo hệ số xung của người dùng.
-// Giả định lưu lượng lớn nhất là 2000 L/h (bơm Dầu Đi luôn lớn hơn nhiều so với lượng tiêu thụ).
-static uint32_t get_debounce_ms(uint8_t is_return) {
-    // Cố định thời gian chặn nhiễu ở mức 60ms cho cả 2 kênh để chặn sườn xuống.
-    return 20;
-}
+/*===========================================================================
+ * Internal state
+ *===========================================================================*/
 
+/* Tổng số xung tích lũy (volatile vì được ghi trong EXTI ISR) */
 static volatile uint32_t oil1_total_pulses = 0;
 static volatile uint32_t oil2_total_pulses = 0;
 
-static volatile uint32_t oil1_last_tick = 0;
-static volatile uint32_t oil2_last_tick = 0;
-static volatile uint32_t oil1_last_valid_tick = 0;
-static volatile uint32_t oil2_last_valid_tick = 0;
+/* Snapshot xung của giây trước — dùng để tính Hz */
+static uint32_t last_oil1_total = 0;
+static uint32_t last_oil2_total = 0;
 
-#define PERIOD_MA_SIZE 64
+/* Hz đo được trong giây vừa qua */
+static uint32_t last_diff1 = 0;
+static uint32_t last_diff2 = 0;
 
-static volatile uint32_t oil1_periods[PERIOD_MA_SIZE] = {0};
-static volatile uint8_t  oil1_p_idx = 0;
-static volatile uint32_t oil1_period_avg = 0;
+/* Tổng lít tích lũy — nhất quán với L/h realtime (dùng calibration table) */
+static double oil1_total_liters = 0.0;
+static double oil2_total_liters = 0.0;
 
-static volatile uint32_t oil2_periods[PERIOD_MA_SIZE] = {0};
-static volatile uint8_t  oil2_p_idx = 0;
-static volatile uint32_t oil2_period_avg = 0;
+/* Bảng hiệu chỉnh và hệ số bọt khí */
+CalibrationPoint_t g_calib_table[10] = {0};
+uint16_t RETURN_BUBBLE_PCT  = 0;
+uint16_t FORWARD_BUBBLE_PCT = 0;
+
+/*===========================================================================
+ * EXTI Callback — đếm xung rising edge với software debounce
+ *
+ * Debounce dùng DWT Cycle Counter (không chiếm timer):
+ *   Nếu 2 rising edge cách nhau < DEBOUNCE_US → bỏ qua (nhiễu ringing)
+ *
+ * Với cảm biến Hall/Turbine: thường >= 5ms giữa 2 xung thực ở lưu lượng cao.
+ * Cài DEBOUNCE_US = 2000 (2ms) là an toàn cho hầu hết flow meter.
+ *===========================================================================*/
+
+#define DEBOUNCE_US     2000U   /* µs — tăng nếu cảm biến bị nhiễu nhiều hơn */
+#define CPU_MHZ         48U     /* MHz — phải khớp với SystemClock (HSI×6 = 48MHz) */
+#define DEBOUNCE_CYCLES (DEBOUNCE_US * CPU_MHZ)
+
+static uint32_t oil1_last_cycle = 0;
+static uint32_t oil2_last_cycle = 0;
+
+/* Đọc DWT Cycle Counter — không tốn timer phần cứng */
+static inline uint32_t DWT_GetCycles(void)
+{
+    return DWT->CYCCNT;
+}
+
+/* Khởi động DWT nếu chưa bật (gọi 1 lần trong Init) */
+void ExtiCounter_DWT_Init(void)
+{
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT       = 0;
+    DWT->CTRL        |= DWT_CTRL_CYCCNTENA_Msk;
+}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-    uint32_t now = HAL_GetTick();
-    
-    // Bắt ngắt cho OIL 1 (Cảm biến dầu đi)
-    if (GPIO_Pin == OIL_1_Pin) 
+    if (GPIO_Pin == OIL_1_Pin)
     {
-        uint32_t debounce_limit = get_debounce_ms(0);
-        uint32_t time_since_last_valid = now - oil1_last_valid_tick;
-        
-        if (oil1_last_valid_tick == 0 || time_since_last_valid > debounce_limit) {
-            if (oil1_last_valid_tick != 0 && time_since_last_valid > 0) {
-                if (oil1_periods[0] == 0) {
-                    for(int i=0; i<PERIOD_MA_SIZE; i++) oil1_periods[i] = time_since_last_valid;
-                }
-                oil1_periods[oil1_p_idx] = time_since_last_valid;
-                oil1_p_idx = (oil1_p_idx + 1) % PERIOD_MA_SIZE;
-                
-                uint32_t sum = 0;
-                for(int i=0; i<PERIOD_MA_SIZE; i++) sum += oil1_periods[i];
-                oil1_period_avg = sum / PERIOD_MA_SIZE;
-            }
-            
-            oil1_last_valid_tick = now;
+        if (HAL_GPIO_ReadPin(OIL_1_GPIO_Port, OIL_1_Pin) == GPIO_PIN_RESET) return;
+
+        uint32_t now = DWT_GetCycles();
+        if ((now - oil1_last_cycle) >= DEBOUNCE_CYCLES)
+        {
+            oil1_last_cycle = now;
             oil1_total_pulses++;
         }
+        /* else: bỏ qua — nhiễu ringing */
     }
-    
-    // Bắt ngắt cho OIL 2 (Cảm biến dầu về)
     else if (GPIO_Pin == OIL_2_Pin)
     {
-        uint32_t debounce_limit = get_debounce_ms(1);
-        uint32_t time_since_last_valid = now - oil2_last_valid_tick;
-        
-        if (oil2_last_valid_tick == 0 || time_since_last_valid > debounce_limit) {
-            if (oil2_last_valid_tick != 0 && time_since_last_valid > 0) {
-                if (oil2_periods[0] == 0) {
-                    for(int i=0; i<PERIOD_MA_SIZE; i++) oil2_periods[i] = time_since_last_valid;
-                }
-                oil2_periods[oil2_p_idx] = time_since_last_valid;
-                oil2_p_idx = (oil2_p_idx + 1) % PERIOD_MA_SIZE;
-                
-                uint32_t sum = 0;
-                for(int i=0; i<PERIOD_MA_SIZE; i++) sum += oil2_periods[i];
-                oil2_period_avg = sum / PERIOD_MA_SIZE;
-            }
-            
-            oil2_last_valid_tick = now;
+        if (HAL_GPIO_ReadPin(OIL_2_GPIO_Port, OIL_2_Pin) == GPIO_PIN_RESET) return;
+
+        uint32_t now = DWT_GetCycles();
+        if ((now - oil2_last_cycle) >= DEBOUNCE_CYCLES)
+        {
+            oil2_last_cycle = now;
             oil2_total_pulses++;
         }
     }
 }
+
+/*===========================================================================
+ * Reset — xóa sạch TẤT CẢ biến để tránh underflow sau khi ghi log
+ *===========================================================================*/
 
 void ExtiCounter_Reset(void)
 {
     __disable_irq();
     oil1_total_pulses = 0;
     oil2_total_pulses = 0;
+    last_oil1_total   = 0;   /* FIX: đồng bộ snapshot tránh underflow uint32 */
+    last_oil2_total   = 0;
+    last_diff1        = 0;
+    last_diff2        = 0;
+    oil1_total_liters = 0.0;
+    oil2_total_liters = 0.0;
     __enable_irq();
 }
 
-uint32_t ExtiCounter_GetOil1(void)
+/*===========================================================================
+ * Getters — xung và Hz
+ *===========================================================================*/
+
+uint32_t ExtiCounter_GetOil1(void) { return oil1_total_pulses; }
+uint32_t ExtiCounter_GetOil2(void) { return oil2_total_pulses; }
+
+uint32_t ExtiCounter_GetOil1_Hz(void) { return last_diff1; }
+uint32_t ExtiCounter_GetOil2_Hz(void) { return last_diff2; }
+
+/*===========================================================================
+ * Calibration Table — nội suy tuyến tính
+ *===========================================================================*/
+
+float Get_Interpolated_Coef(uint32_t hz, float default_coef)
 {
-    return oil1_total_pulses;
+    /* Bảng rỗng → dùng hệ số mặc định */
+    if (g_calib_table[0].freq_hz == 0 && g_calib_table[0].coef < 1.0f)
+        return default_coef;
+
+    for (int i = 0; i < 9; i++)
+    {
+        uint32_t f1 = g_calib_table[i].freq_hz;
+        float    c1 = g_calib_table[i].coef;
+        uint32_t f2 = g_calib_table[i + 1].freq_hz;
+        float    c2 = g_calib_table[i + 1].coef;
+
+        if (f1 == 0 && c1 < 1.0f) break;               /* Hết dữ liệu */
+        if (i == 0 && hz <= f1)   return c1;            /* Nhỏ hơn Min */
+        if (f2 == 0 && c2 < 1.0f && hz >= f1) return c1; /* Lớn hơn Max */
+
+        if (hz >= f1 && hz <= f2)
+        {
+            if (f2 == f1) return c1;
+            float ratio = (float)(hz - f1) / (float)(f2 - f1);
+            return c1 + ratio * (c2 - c1);
+        }
+    }
+
+    /* Lớn hơn điểm cuối cùng */
+    if (g_calib_table[9].freq_hz > 0 || g_calib_table[9].coef >= 1.0f)
+        return g_calib_table[9].coef;
+
+    return default_coef;
 }
 
-uint32_t ExtiCounter_GetOil2(void)
+/*===========================================================================
+ * ExtiCounter_1s_Process — gọi mỗi 1 giây bởi Scheduler
+ *
+ * Tính Hz và tích lũy lít bằng calibration table (nhất quán với L/h realtime).
+ *===========================================================================*/
+
+void ExtiCounter_1s_Process(void)
 {
-    return oil2_total_pulses;
+    uint32_t current_oil1 = oil1_total_pulses;
+    uint32_t current_oil2 = oil2_total_pulses;
+
+    uint32_t diff1 = current_oil1 - last_oil1_total;
+    uint32_t diff2 = current_oil2 - last_oil2_total;
+
+    last_oil1_total = current_oil1;
+    last_oil2_total = current_oil2;
+    last_diff1      = diff1;
+    last_diff2      = diff2;
+
+    /* FIX: Tích lũy lít theo calibration table — nhất quán với giá trị L/h hiển thị */
+    if (diff1 > 0)
+    {
+        float base1  = (OIL_1_CONS > 0) ? ((float)OIL_1_CONS / 10.0f)
+                                         : ((float)OIL_IN_PULSE_PER_LITER / 10.0f);
+        float coef1  = Get_Interpolated_Coef(diff1, base1);
+        double delta = (double)diff1 / (double)coef1;
+        /* Áp dụng bù bọt khí */
+        delta *= (100.0 - (double)FORWARD_BUBBLE_PCT) / 100.0;
+        oil1_total_liters += delta;
+    }
+
+    if (diff2 > 0)
+    {
+        float base2  = (OIL_2_CONS > 0) ? ((float)OIL_2_CONS / 10.0f)
+                                         : ((float)OIL_OUT_PULSE_PER_LITER / 10.0f);
+        float coef2  = Get_Interpolated_Coef(diff2, base2);
+        double delta = (double)diff2 / (double)coef2;
+        delta *= (100.0 - (double)RETURN_BUBBLE_PCT) / 100.0;
+        oil2_total_liters += delta;
+    }
 }
 
-uint32_t ExtiCounter_GetOil1_Period(void)
+/*===========================================================================
+ * Liters — getters / setters
+ *===========================================================================*/
+
+double ExtiCounter_GetOil1Liters(void) { return oil1_total_liters; }
+double ExtiCounter_GetOil2Liters(void) { return oil2_total_liters; }
+
+void ExtiCounter_SetOil1Liters(double liters) { oil1_total_liters = liters; }
+void ExtiCounter_SetOil2Liters(double liters) { oil2_total_liters = liters; }
+
+double ExtiCounter_GetTotalLiters(void)
 {
-    uint32_t now = HAL_GetTick();
-    // Thay vì dùng oil1_last_tick (bị reset liên tục bởi nhiễu), dùng oil1_last_valid_tick!
-    uint32_t elapsed = now - oil1_last_valid_tick;
-    
-    if (elapsed > 10000) { // Timeout 10s tuyệt đối -> Min flow rate ~3.6 L/h
-        oil1_period_avg = 0;
-        for(int i=0; i<PERIOD_MA_SIZE; i++) oil1_periods[i] = 0;
-        return 0;
-    }
-    
-    // Thuật toán Ép rớt dốc (Decay):
-    if (elapsed > oil1_period_avg && oil1_period_avg != 0) {
-        return elapsed;
-    }
-    
-    return oil1_period_avg;
+    double net = oil1_total_liters - oil2_total_liters;
+    return (net > 0.0) ? net : 0.0;
 }
 
-uint32_t ExtiCounter_GetOil2_Period(void)
+/* FIX: Hàm này không còn rỗng — reset bộ đếm lít về 0 sau mỗi lần ghi log */
+void ExtiCounter_SetTotalLiters(double liters)
 {
-    uint32_t now = HAL_GetTick();
-    uint32_t elapsed = now - oil2_last_valid_tick;
-    
-    if (elapsed > 10000) { // Timeout 10s tuyệt đối
-        oil2_period_avg = 0;
-        for(int i=0; i<PERIOD_MA_SIZE; i++) oil2_periods[i] = 0;
-        return 0;
-    }
-    
-    if (elapsed > oil2_period_avg && oil2_period_avg != 0) {
-        return elapsed;
-    }
-    
-    return oil2_period_avg;
+    oil1_total_liters = liters;
+    oil2_total_liters = 0.0;
 }
+
+/*===========================================================================
+ * Pulses — setters (dùng khi khôi phục trạng thái từ Flash khi khởi động)
+ *===========================================================================*/
+
+void ExtiCounter_SetOil1Pulses(uint32_t pulses)
+{
+    __disable_irq();
+    oil1_total_pulses = pulses;
+    last_oil1_total   = pulses; /* FIX: đồng bộ snapshot tránh underflow */
+    __enable_irq();
+}
+
+void ExtiCounter_SetOil2Pulses(uint32_t pulses)
+{
+    __disable_irq();
+    oil2_total_pulses = pulses;
+    last_oil2_total   = pulses;
+    __enable_irq();
+}
+
+/*===========================================================================
+ * Calibration Table — lưu / đọc Flash
+ *===========================================================================*/
+
+void ExtiCounter_SetCalibPoint(uint8_t index, uint32_t freq, float coef)
+{
+    if (index >= 10) return;
+
+    g_calib_table[index].freq_hz = freq;
+    g_calib_table[index].coef    = coef;
+
+    extern void W_Flash_Sector_Erase(uint32_t sector_address);
+    extern void W_Flash_Write_Arr(uint32_t WriteAddr, const uint8_t *pBuffer, uint16_t NumByteToWrite);
+
+    uint32_t flash_addr  = AD_OIL_CALIB_TABLE;
+    uint32_t sector_base = flash_addr & 0xFFFFF000;
+    W_Flash_Sector_Erase(sector_base);
+    W_Flash_Write_Arr(flash_addr, (const uint8_t *)g_calib_table, sizeof(g_calib_table));
+}
+
+void ExtiCounter_GetCalibPoint(uint8_t index, uint32_t *freq, float *coef)
+{
+    if (index >= 10) return;
+    *freq = g_calib_table[index].freq_hz;
+    *coef = g_calib_table[index].coef;
+}
+

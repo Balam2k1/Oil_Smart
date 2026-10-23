@@ -12,6 +12,12 @@
 #include "w25q32.h"
 #include "kalman_filter.h"
 
+/* Hệ số hiệu chỉnh lưu lượng (từ Flash) */
+extern uint16_t OIL_1_CONS;
+extern uint16_t OIL_2_CONS;
+extern uint16_t RETURN_BUBBLE_PCT;
+extern uint16_t FORWARD_BUBBLE_PCT;
+
 Kalman1D_t kalman_rpm;
 
 static uint32_t LastTick = 0;
@@ -28,6 +34,7 @@ bool FLASH_LogEnable = false;
 
 void SensorManager_Init(void)
 {
+    ExtiCounter_DWT_Init(); /* Bật DWT cycle counter để debounce xung dầu */
     ADC_Driver_Init();
     TimerCounter_Init();
     
@@ -77,30 +84,48 @@ uint16_t Sensor_CalcRPM_Local(uint32_t period)
 uint16_t Sensor_CalcOil_Modbus(uint16_t raw)
 {
     // Modbus trả tổng xung tích lũy (Flow Meter), không phải L/h trực tiếp.
-    // Tạm thời để trống (TODO: Implement difference calculation)
+    // TODO: Implement difference calculation
     return 0;
 }
 
-uint16_t Sensor_CalcOil_Frequency(uint32_t current_pulses, uint8_t is_return)
+/**
+ * @brief  Tính lưu lượng dầu realtime (L/h x10) từ tần số xung EXTI.
+ *
+ * @param  is_return  0 = dầu đi (Oil 1),  1 = dầu về (Oil 2)
+ * @return Lưu lượng x10 (ví dụ: 105 = 10.5 L/h)
+ *
+ * Công thức:
+ *   coef    = xung/lít (hiệu chỉnh theo calibration table)
+ *   L/h     = Hz * 3600 / coef
+ *   L/h×10  = Hz * 36000 / coef
+ *
+ * Bubble correction được áp dụng riêng cho từng đường dầu.
+ */
+uint16_t Sensor_CalcOil_Frequency(uint8_t is_return)
 {
-    extern uint16_t OIL_1_CONS;
-    extern uint16_t OIL_2_CONS;
-    uint32_t coef = is_return ? 
-                    ((OIL_2_CONS > 0) ? OIL_2_CONS : OIL_OUT_PULSE_PER_LITER) : 
-                    ((OIL_1_CONS > 0) ? OIL_1_CONS : OIL_IN_PULSE_PER_LITER);
-                    
-    uint32_t period = is_return ? ExtiCounter_GetOil2_Period() : ExtiCounter_GetOil1_Period();
-    if (period == 0) return 0;
-    
-    // Thuật toán đếm chu kỳ (Period) TỐI GIẢN & CHÍNH XÁC NHẤT:
-    // - Tần số (Hz) = 1000 / period
-    // - L/h = Hz * 3600 / (coef / 10) = (1000 / period) * 36000 / coef
-    // - Do màn hình LED cần giá trị (L/h * 10), ta nhân thêm 10
-    // => Flow_Value = 360,000,000 / (period * coef)
-    
-    uint64_t flow = 360000000ULL / ((uint64_t)period * coef);
-    
-    if (flow > 65535) return 65535;
+    uint32_t hz = is_return ? ExtiCounter_GetOil2_Hz() : ExtiCounter_GetOil1_Hz();
+    if (hz == 0) return 0;
+
+    /* Hệ số gốc (xung/lít): ưu tiên giá trị người dùng cài, fallback về hằng số compile-time */
+    float base_coef;
+    if (is_return)
+        base_coef = (OIL_2_CONS > 0) ? ((float)OIL_2_CONS / 10.0f) : ((float)OIL_OUT_PULSE_PER_LITER / 10.0f);
+    else
+        base_coef = (OIL_1_CONS > 0) ? ((float)OIL_1_CONS / 10.0f) : ((float)OIL_IN_PULSE_PER_LITER / 10.0f);
+
+    /* Nội suy theo bảng calibration */
+    float actual_coef = Get_Interpolated_Coef(hz, base_coef);
+
+    /* Tính L/h × 10 */
+    float flow = ((float)hz * 36000.0f) / actual_coef;
+
+    /* Bù bọt khí */
+    if (is_return)
+        flow *= (100.0f - (float)RETURN_BUBBLE_PCT)  / 100.0f;
+    else
+        flow *= (100.0f - (float)FORWARD_BUBBLE_PCT) / 100.0f;
+
+    if (flow > 65535.0f) return 65535;
     return (uint16_t)flow;
 }
 
@@ -114,7 +139,7 @@ uint32_t Sensor_GetOperatingHours(uint8_t sensor)
     if (Online[sensor]) {
         return (uint32_t)OperatingHours[sensor] * 60; // Cảm biến Modbus gửi lên là GIỜ, nhân 60 để quy về PHÚT
     }
-    return gSensorRunTimes[sensor]; // Biến nội bộ đã được lưu bằng PHÚT
+    return gRuntimeData.SensorRunTimes[sensor]; // Biến nội bộ đã được lưu bằng PHÚT
 }
 
 uint16_t Sensor_GetType(uint8_t sensor)
@@ -335,44 +360,41 @@ void SensorManager_Task(void)
     // Temperature (Modbus ID 101 -> Index 0)
     if (Online[0]) gSensorData.Temperature = Sensor_CalcTemperature_Modbus(RawData[0]);
     else           gSensorData.Temperature = Sensor_CalcTemperature_Local(RawTemp);
-    if (!(gSensorEnableMask & (1 << 0))) gSensorData.Temperature = 0;
+    if (!(gConfigData.SensorEnableMask & (1 << 0))) gSensorData.Temperature = 0;
 
     // RPM (Modbus ID 102 -> Index 1)
     if (Online[1]) gSensorData.RPM = Sensor_CalcRPM_Modbus(RawData[1]);
     else           gSensorData.RPM = Sensor_CalcRPM_Local(TimerCounter_GetTachoPeriod());
-    if (!(gSensorEnableMask & (1 << 1))) gSensorData.RPM = 0;
+    if (!(gConfigData.SensorEnableMask & (1 << 1))) gSensorData.RPM = 0;
 
     // Pressure (Modbus ID 103 -> Index 2)
     if (Online[2]) gSensorData.Pressure = Sensor_CalcPressure_Modbus(RawData[2]);
     else           gSensorData.Pressure = Sensor_CalcPressure_Local(RawPressure);
-    if (!(gSensorEnableMask & (1 << 2))) gSensorData.Pressure = 0;
+    if (!(gConfigData.SensorEnableMask & (1 << 2))) gSensorData.Pressure = 0;
 
     // Oil Forward (Modbus ID 104 -> Index 3)
     if (Online[3]) gSensorData.OilForward = Sensor_CalcOil_Modbus(RawData[3]);
-    else           gSensorData.OilForward = Sensor_CalcOil_Frequency(ExtiCounter_GetOil1(), 0);
-    if (!(gSensorEnableMask & (1 << 3))) gSensorData.OilForward = 0;
+    else           gSensorData.OilForward = Sensor_CalcOil_Frequency(0);
+    if (!(gConfigData.SensorEnableMask & (1 << 3))) gSensorData.OilForward = 0;
 
     // Oil Return (Modbus ID 105 -> Index 4)
     if (Online[4]) gSensorData.OilReturn = Sensor_CalcOil_Modbus(RawData[4]);
-    else           gSensorData.OilReturn = Sensor_CalcOil_Frequency(ExtiCounter_GetOil2(), 1);
-    if (!(gSensorEnableMask & (1 << 4))) gSensorData.OilReturn = 0;
+    else           gSensorData.OilReturn = Sensor_CalcOil_Frequency(1);
+    if (!(gConfigData.SensorEnableMask & (1 << 4))) gSensorData.OilReturn = 0;
 
     /*================ MANUAL LOG =================*/
-    extern uint16_t OIL_1_CONS, OIL_2_CONS;
-    uint32_t c1 = (OIL_1_CONS > 0) ? OIL_1_CONS : OIL_IN_PULSE_PER_LITER;
-    uint32_t c2 = (OIL_2_CONS > 0) ? OIL_2_CONS : OIL_OUT_PULSE_PER_LITER;
     uint32_t t1 = ExtiCounter_GetOil1();
     uint32_t t2 = ExtiCounter_GetOil2();
-    uint32_t l1 = (t1 * 100) / c1;
-    uint32_t l2 = (t2 * 100) / c2;
+    uint32_t l1 = (uint32_t)(ExtiCounter_GetOil1Liters() * 100.0);
+    uint32_t l2 = (uint32_t)(ExtiCounter_GetOil2Liters() * 100.0);
 
     if (SENSOR_LogEnable) {
         LOG_Printf("\r\n====== SENSOR DATA ======\r\n");
         LOG_Printf("[VOLT] Raw: %u -> Vin: %u.%u V\r\n", RawVin, gSensorData.Vin / 10, gSensorData.Vin % 10);
         LOG_Printf("[PRES] Raw: %u -> Pres: %u.%u Bar\r\n", RawPressure, gSensorData.Pressure / 10, gSensorData.Pressure % 10);
         LOG_Printf("[RPM ] Period: %lu us -> RPM: %u\r\n", TimerCounter_GetTachoPeriod(), gSensorData.RPM);
-        LOG_Printf("[OIL+] Period: %lu ms | Total: %lu pulses (%lu.%lu L) -> Flow: %u.%u L/h\r\n", ExtiCounter_GetOil1_Period(), t1, l1 / 10, l1 % 10, gSensorData.OilForward / 10, gSensorData.OilForward % 10);
-        LOG_Printf("[OIL-] Period: %lu ms | Total: %lu pulses (%lu.%lu L) -> Flow: %u.%u L/h\r\n", ExtiCounter_GetOil2_Period(), t2, l2 / 10, l2 % 10, gSensorData.OilReturn / 10, gSensorData.OilReturn % 10);
+        LOG_Printf("[OIL+] Freq: %lu Hz | Total: %lu pulses (%lu.%lu L) -> Flow: %u.%u L/h\r\n", ExtiCounter_GetOil1_Hz(), t1, l1 / 10, l1 % 10, gSensorData.OilForward / 10, gSensorData.OilForward % 10);
+        LOG_Printf("[OIL-] Freq: %lu Hz | Total: %lu pulses (%lu.%lu L) -> Flow: %u.%u L/h\r\n", ExtiCounter_GetOil2_Hz(), t2, l2 / 10, l2 % 10, gSensorData.OilReturn / 10, gSensorData.OilReturn % 10);
         LOG_Printf("=========================\r\n");
     }
 
@@ -400,7 +422,7 @@ void SensorManager_Task(void)
         }
 
         /* Đồng bộ RTC */
-        gSystemUnixTime = DateTimeToUnix(gps_dt.year, gps_dt.month, gps_dt.day, gps_dt.hour, gps_dt.minute, gps_dt.second);
+        gSystemData.UnixTime = DateTimeToUnix(gps_dt.year, gps_dt.month, gps_dt.day, gps_dt.hour, gps_dt.minute, gps_dt.second);
         
         /* Cập nhật DS1307 */
         DS1307_Time ds_time;
@@ -433,13 +455,13 @@ void SensorManager_Task(void)
         if (DS1307_GetTime(&ds_time)) {
             uint32_t t = DateTimeToUnix(ds_time.year, ds_time.month, ds_time.date, ds_time.hour, ds_time.min, ds_time.sec);
             if (t >= 1782864000) { // Chỉ nhận thời gian hợp lệ (Từ 01/07/2026 trở lên)
-                gSystemUnixTime = t;
+                gSystemData.UnixTime = t;
             }
             
             if (GPS_LogEnable) {
                 LOG_Printf("--- RTC: %02u:%02u:%02u %02u/%02u/%02u (Unix: %u) ---\r\n", 
                            ds_time.hour, ds_time.min, ds_time.sec, 
-                           ds_time.date, ds_time.month, ds_time.year, gSystemUnixTime);
+                           ds_time.date, ds_time.month, ds_time.year, gSystemData.UnixTime);
             }
         } else {
             if (GPS_LogEnable) {
@@ -451,12 +473,12 @@ void SensorManager_Task(void)
         HAL_GPIO_WritePin(GPS_LED_PORT, GPS_LED_PIN, GPIO_PIN_RESET);
     }
 
-    /* Ghi log dữ liệu vào Flash theo chu kỳ gLogInterval */
+    /* Ghi log dữ liệu vào Flash theo chu kỳ gConfigData.LogInterval */
     static uint32_t last_log_tick = 0;
     
     if (gps_rec.status) {
-        gLastLatitude = gps_rec.lat;
-        gLastLongitude = gps_rec.lon;
+        gLocationData.Latitude = gps_rec.lat;
+        gLocationData.Longitude = gps_rec.lon;
     }
     
     /* Cập nhật đếm số giờ chạy động cơ (1 giây / lần) */
@@ -475,14 +497,14 @@ void SensorManager_Task(void)
         
         // 2. Đếm thời gian nổ máy (Run Time) - Có vòng tua mới đếm
         if (gSensorData.RPM > 0) {
-            gEngineRunSeconds++;
-            gEngineRunSinceLastLog++;
-            if (gEngineRunSeconds >= 60) {
-                gEngineRunSeconds = 0;
+            gRuntimeData.EngineRunSeconds++;
+            gRuntimeData.EngineRunSinceLastLog++;
+            if (gRuntimeData.EngineRunSeconds >= 60) {
+                gRuntimeData.EngineRunSeconds = 0;
                 gRuntimeData.RunTime++;
                 
                 for(int i = 0; i < 5; i++) {
-                    gSensorRunTimes[i]++;
+                    gRuntimeData.SensorRunTimes[i]++;
                 }
                 
                 // Chỉ lưu vào Flash mỗi 60 phút (1 tiếng) để bảo vệ tuổi thọ chip Flash
@@ -496,7 +518,7 @@ void SensorManager_Task(void)
                     W_Flash_Read_Arr(sector_addr, W25Q32_Sector_Buf, 4096);
                     for(int i = 0; i < 5; i++) {
                         uint32_t offset = (AD_SENSOR_RUNTIME_BASE + (i * 4)) & 0x0FFF;
-                        uint32_t val = gSensorRunTimes[i];
+                        uint32_t val = gRuntimeData.SensorRunTimes[i];
                         W25Q32_Sector_Buf[offset]   = (val >> 24) & 0xFF;
                         W25Q32_Sector_Buf[offset+1] = (val >> 16) & 0xFF;
                         W25Q32_Sector_Buf[offset+2] = (val >> 8) & 0xFF;
@@ -514,28 +536,11 @@ void SensorManager_Task(void)
     }
     
     // --- Tính lượng dầu tiêu thụ Real-time (Tích lũy từ lần ghi log trước) ---
-    uint32_t rt_o1 = ExtiCounter_GetOil1();
-    uint32_t rt_o2 = ExtiCounter_GetOil2();
     
-    extern uint16_t OIL_1_CONS;
-    extern uint16_t OIL_2_CONS;
-    uint32_t coef1 = (OIL_1_CONS > 0) ? OIL_1_CONS : OIL_IN_PULSE_PER_LITER;
-    uint32_t coef2 = (OIL_2_CONS > 0) ? OIL_2_CONS : OIL_OUT_PULSE_PER_LITER;
+    double total_liters = ExtiCounter_GetTotalLiters();
+    uint32_t liters_x100 = (uint32_t)(total_liters * 100.0);
     
-    // Quy đổi số Xung ra Số Lít (Nhân 10000 để giữ độ chính xác thập phân)
-    // Lưu ý: coef1 đang là (Xung_Trên_Lít * 10). 
-    // Lít = Xung / (coef / 10) = (Xung * 10) / coef
-    // Lít * 10000 = (Xung * 100000) / coef
-    uint64_t lit1_10k = ((uint64_t)rt_o1 * 100000) / coef1;
-    uint64_t lit2_10k = ((uint64_t)rt_o2 * 100000) / coef2;
-    
-    // Trừ Số Lít (Lít Đi - Lít Về)
-    uint64_t lit_consumed_10k = (lit1_10k > lit2_10k) ? (lit1_10k - lit2_10k) : 0;
-    
-    // Lưu thẳng bằng Lít (Nhân 100 để lưu dạng số nguyên, ví dụ 15.52 Lít -> 1552)
-    uint32_t rt_consumed = lit_consumed_10k / 100;
-    
-    gSensorData.OilConsumption = (rt_consumed > 65535) ? 65535 : (uint16_t)rt_consumed;
+    gSensorData.OilConsumption = (liters_x100 > 65535) ? 65535 : (uint16_t)liters_x100;
 
     /* Kiểm tra ghi bản tin khởi động */
     static uint32_t gBootTick = 0;
@@ -554,34 +559,45 @@ void SensorManager_Task(void)
         if (gps_stable || timeout) {
             DataRecord_t record;
             memset(&record, 0, sizeof(record));
-            record.Latitude = gLastLatitude;
-            record.Longitude = gLastLongitude;
-            record.Timestamp = gSystemUnixTime;
-            record.OilConsumed = gSensorData.OilConsumption;
+            record.Latitude = gLocationData.Latitude;
+            record.Longitude = gLocationData.Longitude;
+            record.Timestamp = gSystemData.UnixTime;
+            
+            double lit = ExtiCounter_GetTotalLiters();
+            record.Total_Oil_Consumed = (uint32_t)(lit * 100.0); // Liters * 100
+            record.Oil1_TotalPulses = ExtiCounter_GetOil1();
+            record.Oil2_TotalPulses = ExtiCounter_GetOil2();
+            record.Oil1_TotalLiters = (uint32_t)(ExtiCounter_GetOil1Liters() * 100.0);
+            record.Oil2_TotalLiters = (uint32_t)(ExtiCounter_GetOil2Liters() * 100.0);
+            
             record.Voltage = gSensorData.Vin;
             record.RPM = gSensorData.RPM;
             record.Temperature = gSensorData.Temperature;
             record.Pressure = gSensorData.Pressure;
-            record.EngineRunTime = gEngineRunSinceLastLog;
+            record.EngineRunTime = gRuntimeData.EngineRunSinceLastLog;
             record.RecordType = 1; // 1: Bản tin khởi động (Startup)
             
-            gEngineRunSinceLastLog = 0;
+            gRuntimeData.EngineRunSinceLastLog = 0;
+            // Xóa bộ đếm để bắt đầu lại từ đầu cho chu kỳ tiếp theo
+            extern void ExtiCounter_Reset(void);
+            extern void ExtiCounter_SetTotalLiters(double liters);
             ExtiCounter_Reset();
+            ExtiCounter_SetTotalLiters(0.0);
             
-            uint32_t addr = AD_START_OIL_RECORD + (gRecordCount * sizeof(DataRecord_t));
+            uint32_t addr = AD_START_OIL_RECORD + (gSystemData.RecordCount * sizeof(DataRecord_t));
             if (addr + sizeof(DataRecord_t) <= AD_MAX_FLASH) {
                 if ((addr % 4096) == 0) {
                     extern void W_Flash_Sector_Erase(uint32_t sector_address);
                     W_Flash_Sector_Erase(addr);
                 }
                 W_Flash_Write_Arr(addr, (const uint8_t*)&record, sizeof(DataRecord_t));
-                gRecordCount++;
+                gSystemData.RecordCount++;
                 
                 if (FLASH_LogEnable) {
                     LOG_Printf("\r\n=======================================================\r\n");
-                    LOG_Printf("--- FLASH LOG: Saved STARTUP Record #%u at Unix %u ---\r\n", gRecordCount, gSystemUnixTime);
-                    LOG_Printf("Data: Lat=%ld Lon=%ld Oil=%u Vin=%u RPM=%u Temp=%u PA=%u\r\n",
-                               record.Latitude, record.Longitude, record.OilConsumed, record.Voltage, 
+                    LOG_Printf("--- FLASH LOG: Saved STARTUP Record #%u at Unix %u ---\r\n", gSystemData.RecordCount, gSystemData.UnixTime);
+                    LOG_Printf("Data: Lat=%ld Lon=%ld Oil_Total=%u Vin=%u RPM=%u Temp=%u PA=%u\r\n",
+                               record.Latitude, record.Longitude, record.Total_Oil_Consumed, record.Voltage, 
                                record.RPM, record.Temperature, record.Pressure);
                     LOG_Printf("=======================================================\r\n");
                 }
@@ -592,26 +608,37 @@ void SensorManager_Task(void)
         }
     } else {
         // Ghi log định kỳ hoàn toàn dựa vào timer phần cứng (HAL_GetTick) để miễn nhiễm với việc nhiễu/nhảy thời gian RTC
-        if (HAL_GetTick() - last_log_tick >= (gLogInterval * 1000) && gLogInterval > 0) {
+        if (HAL_GetTick() - last_log_tick >= (gConfigData.LogInterval * 1000) && gConfigData.LogInterval > 0) {
             last_log_tick = HAL_GetTick();
             
             DataRecord_t record;
             memset(&record, 0, sizeof(record));
-            record.Latitude = gLastLatitude;
-            record.Longitude = gLastLongitude;
-            record.Timestamp = gSystemUnixTime;
-            record.OilConsumed = gSensorData.OilConsumption;
+            record.Latitude = gLocationData.Latitude;
+            record.Longitude = gLocationData.Longitude;
+            record.Timestamp = gSystemData.UnixTime;
+            
+            double lit = ExtiCounter_GetTotalLiters();
+            record.Total_Oil_Consumed = (uint32_t)(lit * 100.0); // Liters * 100
+            record.Oil1_TotalPulses = ExtiCounter_GetOil1();
+            record.Oil2_TotalPulses = ExtiCounter_GetOil2();
+            record.Oil1_TotalLiters = (uint32_t)(ExtiCounter_GetOil1Liters() * 100.0);
+            record.Oil2_TotalLiters = (uint32_t)(ExtiCounter_GetOil2Liters() * 100.0);
+            
             record.Voltage = gSensorData.Vin;
             record.RPM = gSensorData.RPM;
             record.Temperature = gSensorData.Temperature;
             record.Pressure = gSensorData.Pressure;
-            record.EngineRunTime = gEngineRunSinceLastLog;
+            record.EngineRunTime = gRuntimeData.EngineRunSinceLastLog;
             record.RecordType = 0; // 0: Bản tin định kỳ (Periodic)
             
-            gEngineRunSinceLastLog = 0;
+            gRuntimeData.EngineRunSinceLastLog = 0;
+            // Xóa bộ đếm để bắt đầu lại từ đầu cho chu kỳ tiếp theo
+            extern void ExtiCounter_Reset(void);
+            extern void ExtiCounter_SetTotalLiters(double liters);
             ExtiCounter_Reset();
+            ExtiCounter_SetTotalLiters(0.0);
             
-            uint32_t addr = AD_START_OIL_RECORD + (gRecordCount * sizeof(DataRecord_t));
+            uint32_t addr = AD_START_OIL_RECORD + (gSystemData.RecordCount * sizeof(DataRecord_t));
             if (addr + sizeof(DataRecord_t) <= AD_MAX_FLASH) {
                 if ((addr % 4096) == 0) {
                     extern void W_Flash_Sector_Erase(uint32_t sector_address);
@@ -619,13 +646,13 @@ void SensorManager_Task(void)
                 }
                 
                 W_Flash_Write_Arr(addr, (const uint8_t*)&record, sizeof(DataRecord_t));
-                gRecordCount++;
+                gSystemData.RecordCount++;
                 
                 if (FLASH_LogEnable) {
                     LOG_Printf("\r\n=======================================================\r\n");
-                    LOG_Printf("--- FLASH LOG: Saved Record #%u at Unix %u ---\r\n", gRecordCount, gSystemUnixTime);
-                    LOG_Printf("Data: Lat=%ld Lon=%ld Oil=%u Vin=%u RPM=%u Temp=%u PA=%u\r\n",
-                               record.Latitude, record.Longitude, record.OilConsumed, record.Voltage, 
+                    LOG_Printf("--- FLASH LOG: Saved Record #%u at Unix %u ---\r\n", gSystemData.RecordCount, gSystemData.UnixTime);
+                    LOG_Printf("Data: Lat=%ld Lon=%ld Oil_Total=%u Vin=%u RPM=%u Temp=%u PA=%u\r\n",
+                               record.Latitude, record.Longitude, record.Total_Oil_Consumed, record.Voltage, 
                                record.RPM, record.Temperature, record.Pressure);
                     LOG_Printf("=======================================================\r\n");
                 }

@@ -4,6 +4,7 @@
 #include "app_config.h"
 #include "Flash_definition.h"
 #include "w25q32.h"
+#include "Exti_Counter.h"
 #include "log.h"
 
 
@@ -11,25 +12,19 @@ DataModel_Sensor_t  gSensorData;
 DataModel_Alarm_t   gAlarmData;
 DataModel_Runtime_t gRuntimeData;
 
-uint32_t gSystemUnixTime = 0;
-uint32_t gFirmwareVersion = 0;
-uint32_t gRecordCount = 0;
-uint32_t gLogInterval = 3600; /* default 60s, changed to 32-bit */
-uint16_t gEngineRunSeconds = 0;
-uint32_t gEngineRunSinceLastLog = 0;
+DataModel_System_t   gSystemData = {0};
 
-int32_t gLastLatitude = 0;
-int32_t gLastLongitude = 0;
+DataModel_Config_t   gConfigData = {
+    .LogInterval       = DEFAULT_LOG_INTERVAL,
+    .ControlMode       = 0,
+    .SensorEnableMask  = DEFAULT_SENSOR_ENABLE_MASK,
+    .SensorMaintLimits = {DEFAULT_MAINT_HOURS, DEFAULT_MAINT_HOURS,
+                          DEFAULT_MAINT_HOURS, DEFAULT_MAINT_HOURS,
+                          DEFAULT_MAINT_HOURS},
+    .LedIntensity      = DEFAULT_LED_INTENSITY,
+};
 
-uint8_t gHardwareUID[12];
-uint8_t gFlashUID[12];
-bool gUidMatched = false;
-
-uint16_t gSensorMaintLimits[5] = {8760, 8760, 8760, 8760, 8760}; // Default 1 year
-uint32_t gSensorRunTimes[5] = {0, 0, 0, 0, 0};
-uint8_t gSystemControlMode = 0;
-uint8_t gSensorEnableMask = 0xFF;
-uint8_t gLedIntensity = 2;
+DataModel_Location_t gLocationData = {0};
 
 
 void DataModel_Init(void)
@@ -42,17 +37,17 @@ void DataModel_Init(void)
     uint32_t ver = W_Flash_Read_Long(AD_VERSION);
     if (ver != FIRMWARE_VERSION_VALUE) {
         W_Flash_Safe_Write_Long(AD_VERSION, FIRMWARE_VERSION_VALUE);
-        gFirmwareVersion = FIRMWARE_VERSION_VALUE;
+        gSystemData.FirmwareVersion = FIRMWARE_VERSION_VALUE;
     } else {
-        gFirmwareVersion = ver;
+        gSystemData.FirmwareVersion = ver;
     }
-    LOG_Printf("Firmware Version: %u\r\n", gFirmwareVersion);
+    LOG_Printf("Firmware Version: %u\r\n", gSystemData.FirmwareVersion);
 
-    /* Tự động quét Flash bằng Binary Search để tìm gRecordCount cực kỳ nhanh (< 1 mili-giây) */
+    /* Tự động quét Flash bằng Binary Search để tìm gSystemData.RecordCount cực kỳ nhanh (< 1 mili-giây) */
     uint32_t low = 0;
     uint32_t high = (AD_MAX_FLASH - AD_START_OIL_RECORD) / sizeof(DataRecord_t);
     uint32_t mid;
-    gRecordCount = 0;
+    gSystemData.RecordCount = 0;
 
     while (low <= high) {
         mid = low + (high - low) / 2;
@@ -63,7 +58,7 @@ void DataModel_Init(void)
         
         if (ts != 0xFFFFFFFF) {
             // Có dữ liệu, vùng chưa ghi phải nằm ở phía sau
-            gRecordCount = mid + 1;
+            gSystemData.RecordCount = mid + 1;
             low = mid + 1;
         } else {
             // Trống, vùng kết thúc nằm ở phía trước
@@ -72,13 +67,28 @@ void DataModel_Init(void)
         }
     }
     
-    LOG_Printf("Total Records Scanned in Flash: %u\r\n", gRecordCount);
+    // Theo logic mới (Mỗi log là 1 Trip độc lập), khi khởi động lại máy sẽ LUÔN BẮT ĐẦU TỪ 0
+    // Không khôi phục số xung và số Lít từ bản ghi cũ nữa.
+    
+    extern void ExtiCounter_SetTotalLiters(double liters);
+    extern void ExtiCounter_SetOil1Liters(double liters);
+    extern void ExtiCounter_SetOil2Liters(double liters);
+    extern void ExtiCounter_SetOil1Pulses(uint32_t pulses);
+    extern void ExtiCounter_SetOil2Pulses(uint32_t pulses);
+
+    ExtiCounter_SetTotalLiters(0.0);
+    ExtiCounter_SetOil1Liters(0.0);
+    ExtiCounter_SetOil2Liters(0.0);
+    ExtiCounter_SetOil1Pulses(0);
+    ExtiCounter_SetOil2Pulses(0);
+
+    LOG_Printf("New Session Started. All Oil counters initialized to 0.\r\n");
 
     uint32_t intv = W_Flash_Read_Long(AD_LOG_INTERVAL);
-    if (intv != 0xFFFFFFFF && intv > 0) gLogInterval = intv;
-    else W_Flash_Safe_Write_Long(AD_LOG_INTERVAL, gLogInterval);
+    if (intv != 0xFFFFFFFF && intv > 0) gConfigData.LogInterval = intv;
+    else W_Flash_Safe_Write_Long(AD_LOG_INTERVAL, gConfigData.LogInterval);
     
-    LOG_Printf("Log Interval: %u seconds\r\n", gLogInterval);
+    LOG_Printf("Log Interval: %u seconds\r\n", gConfigData.LogInterval);
 
     /* Load RunTime from Flash */
     uint32_t rt = W_Flash_Read_Long(AD_TIME_RUN);
@@ -94,21 +104,21 @@ void DataModel_Init(void)
 
     /* --- Read UID from Hardware and Flash --- */
     uint32_t *uid = (uint32_t*)0x1FFFF7AC; // STM32F030 UID register
-    memcpy(gHardwareUID, uid, 12);
+    memcpy(gSystemData.HardwareUID, uid, 12);
     
-    W_Flash_Read_Arr(AD_DEVICE_ID, gFlashUID, 12);
+    W_Flash_Read_Arr(AD_DEVICE_ID, gSystemData.FlashUID, 12);
     bool flash_uid_empty = true;
     for(int i=0; i<12; i++) {
-        if(gFlashUID[i] != 0xFF) { flash_uid_empty = false; break; }
+        if(gSystemData.FlashUID[i] != 0xFF) { flash_uid_empty = false; break; }
     }
     
     if (flash_uid_empty) {
-        W_Flash_Write_Arr(AD_DEVICE_ID, gHardwareUID, 12);
-        memcpy(gFlashUID, gHardwareUID, 12);
+        W_Flash_Write_Arr(AD_DEVICE_ID, gSystemData.HardwareUID, 12);
+        memcpy(gSystemData.FlashUID, gSystemData.HardwareUID, 12);
     }
     
-    gUidMatched = (memcmp(gHardwareUID, gFlashUID, 12) == 0);
-    if (!gUidMatched) {
+    gSystemData.UidMatched = (memcmp(gSystemData.HardwareUID, gSystemData.FlashUID, 12) == 0);
+    if (!gSystemData.UidMatched) {
         LOG_Printf("CRITICAL WARNING: UID MISMATCH!\r\n");
     } else {
         LOG_Printf("UID MATCHED.\r\n");
@@ -117,19 +127,19 @@ void DataModel_Init(void)
     /* --- Load Sensor Enable Mask --- */
     uint16_t mask = W_Flash_Read_Int(AD_SENSOR_ENABLE_MASK);
     if (mask == 0xFFFF) {
-        gSensorEnableMask = 0xFF; // All enabled by default
+        gConfigData.SensorEnableMask = 0xFF; // All enabled by default
         W_Flash_Safe_Write_Int(AD_SENSOR_ENABLE_MASK, 0x00FF);
     } else {
-        gSensorEnableMask = (uint8_t)(mask & 0xFF);
+        gConfigData.SensorEnableMask = (uint8_t)(mask & 0xFF);
     }
 
     /* --- Load System Control Mode --- */
     uint16_t mode = W_Flash_Read_Int(AD_SYSTEM_CONTROL_MODE);
     if (mode == 0xFFFF) {
-        gSystemControlMode = 0; // Default to 0 (Local control)
+        gConfigData.ControlMode = 0; // Default to 0 (Local control)
         W_Flash_Safe_Write_Int(AD_SYSTEM_CONTROL_MODE, 0);
     } else {
-        gSystemControlMode = (uint8_t)(mode & 0xFF);
+        gConfigData.ControlMode = (uint8_t)(mode & 0xFF);
     }
 
     /* --- Load Sensor Maintenance Limits --- */
@@ -141,30 +151,38 @@ void DataModel_Init(void)
     }
     if (maint_empty) {
         for(int i=0; i<5; i++) {
-            maint_buf[i*2] = (gSensorMaintLimits[i] >> 8) & 0xFF;
-            maint_buf[i*2+1] = gSensorMaintLimits[i] & 0xFF;
+            maint_buf[i*2] = (gConfigData.SensorMaintLimits[i] >> 8) & 0xFF;
+            maint_buf[i*2+1] = gConfigData.SensorMaintLimits[i] & 0xFF;
         }
         W_Flash_Write_Arr(AD_SENSOR_MAINT_LIMIT_BASE, maint_buf, 10);
     } else {
         for(int i=0; i<5; i++) {
-            gSensorMaintLimits[i] = (maint_buf[i*2] << 8) | maint_buf[i*2+1];
+            gConfigData.SensorMaintLimits[i] = (maint_buf[i*2] << 8) | maint_buf[i*2+1];
         }
     }
     
     /* --- Load Sensor Run Times --- */
     for (int i = 0; i < 5; i++) {
         uint32_t runtime = W_Flash_Read_Long(AD_SENSOR_RUNTIME_BASE + (i * 4));
-        if (runtime != 0xFFFFFFFF) gSensorRunTimes[i] = runtime;
-        else W_Flash_Safe_Write_Long(AD_SENSOR_RUNTIME_BASE + (i * 4), gSensorRunTimes[i]);
+        if (runtime != 0xFFFFFFFF) gRuntimeData.SensorRunTimes[i] = runtime;
+        else W_Flash_Safe_Write_Long(AD_SENSOR_RUNTIME_BASE + (i * 4), gRuntimeData.SensorRunTimes[i]);
     }
 
     /* --- Load LED Intensity --- */
     uint16_t led_val = W_Flash_Read_Int(AD_LED_INTENSITY);
     if (led_val == 0xFFFF) {
-        gLedIntensity = 2;
-        W_Flash_Safe_Write_Int(AD_LED_INTENSITY, gLedIntensity);
+        gConfigData.LedIntensity = 2;
+        W_Flash_Safe_Write_Int(AD_LED_INTENSITY, gConfigData.LedIntensity);
     } else {
-        gLedIntensity = (uint8_t)(led_val & 0xFF);
+        gConfigData.LedIntensity = (uint8_t)(led_val & 0xFF);
+    }
+    
+    /* --- Load Calibration Table --- */
+    extern CalibrationPoint_t g_calib_table[10];
+    W_Flash_Read_Arr(AD_OIL_CALIB_TABLE, (uint8_t*)g_calib_table, sizeof(g_calib_table));
+    // Verify if flash is empty
+    if (g_calib_table[0].freq_hz == 0xFFFFFFFF) {
+        memset(g_calib_table, 0, sizeof(g_calib_table));
     }
 }
 
@@ -201,8 +219,8 @@ void SystemTime_Update(void)
     uint32_t tick = HAL_GetTick();
     if (tick - last_tick >= 1000) {
         last_tick += 1000;
-        /* gSystemUnixTime được đồng bộ từ GPS hoặc DS1307 bên trong SensorManager_Task, 
+        /* gSystemData.UnixTime được đồng bộ từ GPS hoặc DS1307 bên trong SensorManager_Task, 
            tuy nhiên nếu mất sóng cả 2 thì tự cộng ở đây cũng được. Nhưng không tự cộng RunTime ở đây nữa! */
-        gSystemUnixTime++;
+        gSystemData.UnixTime++;
     }
 }

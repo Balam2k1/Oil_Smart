@@ -86,49 +86,57 @@ void W_Flash_Chip_Erase(void) {
 }
 
 void W_Flash_Write_Arr(uint32_t address, const uint8_t *data, uint16_t length) {
-	 uint16_t i;
-	 for (i=0; i<length; i++)
-	 {
-         /* Tối ưu: Bỏ qua không ghi nếu data là 0xFF (vì flash sau khi xóa mặc định là 0xFF) */
-         if (data[i] != 0xFF) {
-		     W_Flash_Write_Byte(address+i, data[i]);
-         }
-	 }
+    uint32_t current_addr = address;
+    uint16_t data_idx = 0;
+    
+    while (length > 0) {
+        uint16_t space_in_page = 256 - (current_addr % 256);
+        uint16_t write_len = (length < space_in_page) ? length : space_in_page;
+        
+        Flash_Write_Enable();
+        spi_cs_low();
+        uint8_t txHeader[4] = { FLASH_PAGE_PROGRAM, (current_addr >> 16) & 0xFF, (current_addr >> 8) & 0xFF, current_addr & 0xFF };
+        SPI_Software_Transmit_Receive(txHeader, NULL, 4);
+        SPI_Software_Transmit_Receive((uint8_t*)(data + data_idx), NULL, write_len);
+        spi_cs_high();
+        
+        uint32_t timeout = 10;
+        while ((Flash_ReadStatusReg() & 0x01) && --timeout) {
+            HAL_Delay(1);
+        }
+        Flash_Write_Disable();
+        
+        current_addr += write_len;
+        data_idx += write_len;
+        length -= write_len;
+    }
 }
 
 void W_Flash_Write_Int(uint32_t address, uint16_t value)
 {
-	 uint8_t temp;
-	 temp=(uint8_t)(value&0x00FF);
-	 W_Flash_Write_Byte(address+1,temp);
-	 value=value>>8;
-	 temp=(uint8_t)(value&0x00FF);
-	 W_Flash_Write_Byte(address,temp);
+	 uint8_t temp[2];
+	 temp[1] = (uint8_t)(value & 0xFF);
+	 temp[0] = (uint8_t)((value >> 8) & 0xFF);
+	 W_Flash_Write_Arr(address, temp, 2);
 }
 
 void W_Flash_Write_Long(uint32_t address, uint32_t value)
 {
-	 uint8_t temp;
-	 temp=(uint8_t)(value&0x000000FF);
-	 W_Flash_Write_Byte(address+3,temp);
-	 value=value>>8;
-	 temp=(uint8_t)(value&0x000000FF);
-	 W_Flash_Write_Byte(address+2,temp);
-	 value=value>>8;
-	 temp=(uint8_t)(value&0x000000FF);
-	 W_Flash_Write_Byte(address+1,temp);
-	 value=value>>8;
-	 temp=(uint8_t)(value&0x000000FF);
-	 W_Flash_Write_Byte(address,temp);
+	 uint8_t temp[4];
+	 temp[3] = (uint8_t)(value & 0xFF);
+	 temp[2] = (uint8_t)((value >> 8) & 0xFF);
+	 temp[1] = (uint8_t)((value >> 16) & 0xFF);
+	 temp[0] = (uint8_t)((value >> 24) & 0xFF);
+	 W_Flash_Write_Arr(address, temp, 4);
 }
 
 void W_Flash_Read_Arr(uint32_t address, uint8_t *buffer, uint16_t length)
 {
-	 uint16_t i;
-	 for (i=0; i<length; i++)
-	 {
-		 buffer[i] = W_Flash_Read_Byte(address+i);
-	 }
+    uint8_t txData[4] = { FLASH_READ_DATA, (address >> 16) & 0xFF, (address >> 8) & 0xFF, address & 0xFF };
+    spi_cs_low();
+    SPI_Software_Transmit_Receive(txData, NULL, 4);
+    SPI_Software_Transmit_Receive(NULL, buffer, length);
+    spi_cs_high();
 }
 
 uint16_t W_Flash_Read_Int(uint32_t address)

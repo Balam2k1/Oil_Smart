@@ -26,7 +26,7 @@ uint16_t Sensor_CalcRPM_Modbus(uint16_t raw);
 uint16_t Sensor_CalcRPM_Local(uint32_t period);
 
 uint16_t Sensor_CalcOil_Modbus(uint16_t raw);
-uint16_t Sensor_CalcOil_Local(uint32_t period_ms, uint8_t is_return);
+uint16_t Sensor_CalcOil_Frequency(uint8_t is_return);
 
 void SensorManager_LogAll(void);
 void SensorManager_Test(void);

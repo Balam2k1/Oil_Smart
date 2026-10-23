@@ -1,0 +1,48 @@
+Mã lệnh (Hex),Loại lệnh,Mô tả chi tiết
+0xB1,Switch Case,Set Time RTC
+0xB2,Switch Case,"Get Time RTC (6 bytes: H, M, S, Date, Month, Year)"
+0xCB,Switch Case,Debug Raw Oil Pulses
+0xCC,Switch Case,SET Sensor RunTimes (20 Bytes)
+0xCD,Switch Case,GET Sensor RunTimes
+0xD0,Switch Case,"Get Time Sum, Time Run, Count Record (12 bytes - Protocol V1.8)"
+0xD1,Switch Case,Get Data Record (27 bytes - Protocol V1.8)
+0xD2,Switch Case,Get Realtime Data (32 bytes - Protocol V1.8)
+0xD3,Switch Case,Set Volt Constant
+0xD4,Switch Case,Set Temp Constant
+0xD5,Switch Case,Set Pressure Constant
+0xD6,Switch Case,Set Oil_1 Constant
+0xD7,Switch Case,Set Oil_2 Constant
+0xD8,Switch Case,Get All Constants
+0xD9,Switch Case,Get System Information
+0xDA,Switch Case,Reboot System
+0xDB,Switch Case,Set Relay State (ID: 1=Buzzer)
+0xDC,Switch Case,Get Raw Data
+0xDD,Switch Case,Reset Runtime
+0xDE,Switch Case,Set Buzzer Mute State
+0xDF,Switch Case,Delete Flash
+0xE0,Switch Case,Read Set Value
+0xE1,Switch Case,Set Volt Min
+0xE2,Switch Case,Set Volt Max
+0xE3,Switch Case,Set Temperature Max
+0xE4,Switch Case,Set Pressure Max
+0xE5,Switch Case,Set Tacho max
+0xE6,Switch Case,Set Oil flow Max
+0xE7,Switch Case,Set Time Bao duong
+0xE8,Switch Case,Set Log Interval
+0xE9,Switch Case,Read Log Interval
+0xEA,Switch Case,Read Firmware Version
+0xEB,Switch Case,Set Sensor Maint Limits
+0xEC,Switch Case,Get Sensor Maint Limits
+0xED,Switch Case,Set Sensor Enable Mask
+0xEE,Switch Case,Set System Control Mode
+0xEF,Switch Case,RESET Threshold
+0xF0,Switch Case,Set LED Brightness
+0xF1,Switch Case,Set Pressure Min
+0xF2,Switch Case,Get Pressure Min
+0xF5,Switch Case,Set Return Bubble Pct
+0xF6,Switch Case,Get Return Bubble Pct
+0xF7,Switch Case,Set Forward Bubble Pct
+0xF8,Switch Case,Get Forward Bubble Pct
+0xFA,Switch Case,Get Data Record V2 (New 64-byte payload)
+0xFC,Switch Case,Write Calibration Point
+0xFD,Switch Case,Read Calibration Point

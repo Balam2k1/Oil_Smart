@@ -8,20 +8,26 @@
 #include "log.h"
 #include "sensor_manager.h"
 
-uint16_t Limit_Temp = 750;         // 75.0 degrees C
-uint16_t Limit_Pressure = 50;      // 5.0 Bar
-uint16_t Limit_PressureMin = 25;   // 2.5 Bar
-uint16_t Limit_VinMin = 110;       // 11.0 V (ngưỡng điện áp THẤP - pin yếu)
-uint16_t Limit_VinMax = 150;       // 15.0 V (ngưỡng điện áp CAO - quá áp)
-uint16_t Limit_Oil = 1000;         // 10.0 L/h (stored as L/h * 10)
-uint16_t Limit_RPM = 3000;         // 3000 RPM
-uint16_t Limit_MaintenanceTime = 5000; // 5000 hours
+/* Ngưỡng cảnh báo — giá trị mặc định lấy từ app_config.h */
+uint16_t Limit_Temp          = DEFAULT_LIMIT_TEMP;
+uint16_t Limit_Pressure      = DEFAULT_LIMIT_PA_MAX;
+uint16_t Limit_PressureMin   = DEFAULT_LIMIT_PA_MIN;
+uint16_t Limit_VinMin        = DEFAULT_LIMIT_VIN_MIN;
+uint16_t Limit_VinMax        = DEFAULT_LIMIT_VIN_MAX;
+uint16_t Limit_Oil           = DEFAULT_LIMIT_OIL;
+uint16_t Limit_RPM           = DEFAULT_LIMIT_RPM;
+uint16_t Limit_MaintenanceTime = DEFAULT_LIMIT_MAINT_TIME;
 
-uint16_t VOLT_CONS = 36300;
-uint16_t TEMP_CONS = 750;
-uint16_t PA_CONS = 372;
-uint16_t OIL_1_CONS = 1644;
-uint16_t OIL_2_CONS = 1644;
+/* Hệ số hiệu chỉnh cảm biến — giá trị mặc định lấy từ app_config.h */
+uint16_t VOLT_CONS  = DEFAULT_VOLT_CONS;
+uint16_t TEMP_CONS  = DEFAULT_TEMP_CONS;
+uint16_t PA_CONS    = DEFAULT_PA_CONS;
+uint16_t OIL_1_CONS = DEFAULT_OIL_1_CONS;
+uint16_t OIL_2_CONS = DEFAULT_OIL_2_CONS;
+
+/* Khai báo extern tập trung — không rải trong thân hàm */
+extern uint16_t RETURN_BUBBLE_PCT;
+extern uint16_t FORWARD_BUBBLE_PCT;
 
 void AlarmManager_Init(void)
 {
@@ -77,7 +83,7 @@ void AlarmManager_Init(void)
     val = W_Flash_Read_Int(AD_TEMP_CONS);
     if (val != 0xFFFF && val > 100) TEMP_CONS = val;
     else {
-        TEMP_CONS = 750; // Mặc định 1000 = 100.0%
+        TEMP_CONS = DEFAULT_TEMP_CONS;
         W_Flash_Safe_Write_Int(AD_TEMP_CONS, TEMP_CONS);
     }
 
@@ -93,13 +99,22 @@ void AlarmManager_Init(void)
         W_Flash_Safe_Write_Int(AD_PA_CONS, PA_CONS);
     }
 
+    /* OIL_CONS: điều kiện val > 0 để chấp nhận mọi hệ số hợp lệ người dùng cài */
     val = W_Flash_Read_Int(AD_OIL_1_CONS);
-    if (val != 0xFFFF && val > 1000) OIL_1_CONS = val;
+    if (val != 0xFFFF && val > 0) OIL_1_CONS = val;
     else W_Flash_Safe_Write_Int(AD_OIL_1_CONS, OIL_1_CONS);
 
     val = W_Flash_Read_Int(AD_OIL_2_CONS);
-    if (val != 0xFFFF && val > 1000) OIL_2_CONS = val;
+    if (val != 0xFFFF && val > 0) OIL_2_CONS = val;
     else W_Flash_Safe_Write_Int(AD_OIL_2_CONS, OIL_2_CONS);
+
+    val = W_Flash_Read_Int(AD_RETURN_BUBBLE_PCT);
+    if (val != 0xFFFF && val <= 100) RETURN_BUBBLE_PCT = val;
+    else W_Flash_Safe_Write_Int(AD_RETURN_BUBBLE_PCT, RETURN_BUBBLE_PCT);
+
+    val = W_Flash_Read_Int(AD_FORWARD_BUBBLE_PCT);
+    if (val != 0xFFFF && val <= 100) FORWARD_BUBBLE_PCT = val;
+    else W_Flash_Safe_Write_Int(AD_FORWARD_BUBBLE_PCT, FORWARD_BUBBLE_PCT);
 
     LOG_Printf("-----------------------\r\n");
 
@@ -116,13 +131,15 @@ void AlarmManager_Init(void)
     LOG_Printf("----------------------------------\r\n");
 
     // Log the configured sensor constants
-    LOG_Printf("--- SENSOR CONSTANTS CONFIGURATION ---\r\n");
-    LOG_Printf("Volt Cons: %u\r\n", VOLT_CONS);
-    LOG_Printf("Temp Cons: %u\r\n", TEMP_CONS);
-    LOG_Printf("Pressure Cons: %u\r\n", PA_CONS);
-    LOG_Printf("Oil 1 Cons: %u\r\n", OIL_1_CONS);
-    LOG_Printf("Oil 2 Cons: %u\r\n", OIL_2_CONS);
-    LOG_Printf("--------------------------------------\r\n");
+    LOG_Printf("--- SENSOR CONSTANTS ---\r\n");
+    LOG_Printf("Volt  Cons : %u  (divisor Ohm)\r\n", VOLT_CONS);
+    LOG_Printf("Temp  Cons : %u  (x1000)\r\n", TEMP_CONS);
+    LOG_Printf("PA    Cons : %u\r\n", PA_CONS);
+    LOG_Printf("Oil1  Cons : %u  (%.1f pulse/L)\r\n", OIL_1_CONS, (float)OIL_1_CONS / 10.0f);
+    LOG_Printf("Oil2  Cons : %u  (%.1f pulse/L)\r\n", OIL_2_CONS, (float)OIL_2_CONS / 10.0f);
+    LOG_Printf("Bubble FWD : %u%%\r\n", FORWARD_BUBBLE_PCT);
+    LOG_Printf("Bubble RTN : %u%%\r\n", RETURN_BUBBLE_PCT);
+    LOG_Printf("------------------------\r\n");
 }
 
 void AlarmManager_Task(void)
@@ -145,7 +162,7 @@ void AlarmManager_Task(void)
     // Check individual sensor maintenance limits (Limits are in hours, RunTimes are in minutes)
     bool sensorMaintAlarm = false;
     for(int i = 0; i < 5; i++) {
-        if (Sensor_GetOperatingHours(i) >= ((uint32_t)gSensorMaintLimits[i] * 60)) {
+        if (Sensor_GetOperatingHours(i) >= ((uint32_t)gConfigData.SensorMaintLimits[i] * 60)) {
             sensorMaintAlarm = true;
             break;
         }
@@ -154,7 +171,7 @@ void AlarmManager_Task(void)
     bool hasSevereAlarm = gAlarmData.TempAlarm || gAlarmData.PressureAlarm || gAlarmData.RPMAlarm;
     bool hasWarningAlarm = gAlarmData.VinAlarm || gAlarmData.OilAlarm;
     
-    if (gSystemControlMode == 1) {
+    if (gConfigData.ControlMode == 1) {
         Led_maintain(true);
         Led_warning(true);
     } else {
@@ -174,7 +191,7 @@ void AlarmManager_Task(void)
             Buzzer_StartPattern(BUZZER_ALARM_ON_TIME, BUZZER_ALARM_OFF_TIME);
             currentBuzzerState = BUZZER_STATE_ALARM;
         }
-        if (gSystemControlMode != 1) Led_warning(true);
+        if (gConfigData.ControlMode != 1) Led_warning(true);
     }
     else if (hasWarningAlarm)
     {
@@ -183,7 +200,7 @@ void AlarmManager_Task(void)
             Buzzer_StartPattern(BUZZER_WARNING_ON_TIME, BUZZER_WARNING_OFF_TIME);
             currentBuzzerState = BUZZER_STATE_WARNING;
         }
-        if (gSystemControlMode != 1) Led_warning(true);
+        if (gConfigData.ControlMode != 1) Led_warning(true);
     }
     else
     {
@@ -192,6 +209,6 @@ void AlarmManager_Task(void)
             Buzzer_StopPattern();
             currentBuzzerState = BUZZER_STATE_OFF;
         }
-        if (gSystemControlMode != 1) Led_warning(false);
+        if (gConfigData.ControlMode != 1) Led_warning(false);
     }
 }

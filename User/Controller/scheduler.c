@@ -6,9 +6,31 @@
 #include "log.h"
 #include "ds1307.h"
 
-static uint32_t LastSensorTick = 0;
-static uint32_t LastDisplayTick = 0;
-static uint32_t LastAlarmTick = 0;
+#define MAX_TASKS 15
+
+typedef struct {
+    TaskFunction_t pFunc;
+    uint32_t PeriodMs;
+    uint32_t LastTick;
+} Task_t;
+
+static Task_t Tasks[MAX_TASKS];
+static uint8_t TaskCount = 0;
+
+void Scheduler_AddTask(TaskFunction_t pFunc, uint32_t PeriodMs) {
+    if (TaskCount < MAX_TASKS) {
+        Tasks[TaskCount].pFunc = pFunc;
+        Tasks[TaskCount].PeriodMs = PeriodMs;
+        Tasks[TaskCount].LastTick = HAL_GetTick();
+        TaskCount++;
+    }
+}
+
+static void FanControl_Task(void) {
+    HC595_UpdateFan(gSensorData.RPM/100);
+}
+
+extern void ExtiCounter_1s_Process(void);
 
 void Scheduler_Init(void)
 {
@@ -74,53 +96,36 @@ void Scheduler_Init(void)
     LOG_Printf("Init: ESP32...\r\n");
     ESP32_Init();
     
-    LOG_Printf("Init: OK. Entering Main Loop.\r\n");
-    
-    /* Đồng bộ tick khởi tạo */
-    uint32_t now = HAL_GetTick();
-    LastSensorTick = now;
-    LastDisplayTick = now;
-    LastAlarmTick = now;
+    LOG_Printf("Init: OK. Registering Tasks...\r\n");
+
+    /* Đăng ký các tác vụ định kỳ */
+    Scheduler_AddTask(SensorManager_Task, TASK_SENSOR_PERIOD_MS);
+    Scheduler_AddTask(ExtiCounter_1s_Process, 1000);
+    Scheduler_AddTask(AlarmManager_Task, TASK_ALARM_PERIOD_MS);
+    Scheduler_AddTask(FanControl_Task, 20);
+    Scheduler_AddTask(DisplayManager_Task, TASK_DISPLAY_PERIOD_MS);
+
+    /* Đăng ký các tác vụ chạy liên tục (Non-blocking background tasks) */
+    Scheduler_AddTask(SystemTime_Update, 0); // Vốn dùng để update system time, nhưng hàm tự check 1000ms bên trong
+    Scheduler_AddTask(ModbusMaster_Task, 0);
+    Scheduler_AddTask(RS485_Task, 0);
+    Scheduler_AddTask(Buzzer_Task, 0);
+    Scheduler_AddTask(ESP32_Task, 0);
+    Scheduler_AddTask(LOG_Task, 0);
 }
 
 void Scheduler_Run(void)
 {
     uint32_t now = HAL_GetTick();
-    SystemTime_Update();
 
-    /* 1. Tác vụ đọc cảm biến (chu kỳ 200ms) */
-    if ((now - LastSensorTick) >= TASK_SENSOR_PERIOD_MS)
-    {
-        LastSensorTick = now;
-        SensorManager_Task();
+    for (uint8_t i = 0; i < TaskCount; i++) {
+        if (Tasks[i].PeriodMs == 0) {
+            Tasks[i].pFunc();
+        } else {
+            if ((now - Tasks[i].LastTick) >= Tasks[i].PeriodMs) {
+                Tasks[i].LastTick = now;
+                Tasks[i].pFunc();
+            }
+        }
     }
-
-    /* 2. Tác vụ báo động (chu kỳ 100ms) */
-    if ((now - LastAlarmTick) >= TASK_ALARM_PERIOD_MS)
-    {
-        LastAlarmTick = now;
-        AlarmManager_Task();
-    }
-
-    /* 2.5. Tác vụ điều khiển LED Fan (chu kỳ 20ms) */
-    static uint32_t LastFanTick = 0;
-    if ((now - LastFanTick) >= 20)
-    {
-        LastFanTick = now;
-        HC595_UpdateFan(gSensorData.RPM/100);
-    }
-
-    /* 3. Tác vụ hiển thị (chu kỳ 50ms) */
-    if ((now - LastDisplayTick) >= TASK_DISPLAY_PERIOD_MS)
-    {
-        LastDisplayTick = now;
-        DisplayManager_Task();
-    }
-
-    /* 4. Các tác vụ chạy liên tục (Non-blocking background tasks) */
-    ModbusMaster_Task();
-    RS485_Task();
-    Buzzer_Task();
-    ESP32_Task();
-    LOG_Task();
 }

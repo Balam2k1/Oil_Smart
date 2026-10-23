@@ -88,10 +88,48 @@ extern uint16_t PA_CONS;
 #define OIL_OUT_TIMER           (&htim14)
 
 
+/*=========================================================
+ * DEFAULT VALUES — Chỉnh tất cả giá trị mặc định TẠI ĐÂY
+ *
+ * Các giá trị này được dùng khi Flash chưa có dữ liệu
+ * (lần đầu cài firmware hoặc sau khi xóa Flash).
+ * Sau khi ghi vào Flash, giá trị Flash sẽ được ưu tiên.
+ *=========================================================*/
+
+/* --- Ngưỡng cảnh báo --- */
+#define DEFAULT_LIMIT_TEMP          750     /* Nhiệt độ: 75.0 °C (x10) */
+#define DEFAULT_LIMIT_PA_MAX        50      /* Áp suất max: 5.0 Bar (x10) */
+#define DEFAULT_LIMIT_PA_MIN        25      /* Áp suất min: 2.5 Bar (x10) */
+#define DEFAULT_LIMIT_VIN_MIN       110     /* Điện áp thấp: 11.0 V (x10) */
+#define DEFAULT_LIMIT_VIN_MAX       150     /* Điện áp cao: 15.0 V (x10) */
+#define DEFAULT_LIMIT_OIL           1000    /* Lưu lượng dầu min: 100.0 L/h (x10) */
+#define DEFAULT_LIMIT_RPM           3000    /* Vòng tua: 3000 RPM */
+#define DEFAULT_LIMIT_MAINT_TIME    5000    /* Giờ bảo dưỡng: 5000 giờ */
+
+/* --- Hệ số cảm biến (Calibration Constants) ---
+ * Lưu ý: Giá trị lưu trong Flash là x10 để tránh số thực.
+ * Ví dụ: VOLT_CONS = 36300 tức là R1+R2 = 36300 Ohm
+ *        OIL_CONS  = 1644  tức là 164.4 xung/lít            */
+#define DEFAULT_VOLT_CONS           36300   /* Tổng trở chia áp (R1+R2) tính bằng Ohm */
+#define DEFAULT_TEMP_CONS           750     /* Hệ số bù nhiệt (x1000) — 1000 = không bù */
+#define DEFAULT_PA_CONS             372     /* Hệ số bù áp suất */
+#define DEFAULT_OIL_1_CONS          1644    /* Xung/lít x10 — dầu đi  (164.4 xung/lít) */
+#define DEFAULT_OIL_2_CONS          1644    /* Xung/lít x10 — dầu về  (164.4 xung/lít) */
+
+/* --- Bù bọt khí (Bubble Compensation) --- */
+#define DEFAULT_FORWARD_BUBBLE_PCT  0       /* % bọt khí dầu đi  (0-100) */
+#define DEFAULT_RETURN_BUBBLE_PCT   0       /* % bọt khí dầu về  (0-100) */
+
+/* --- Ghi log & hệ thống --- */
+#define DEFAULT_LOG_INTERVAL        3600    /* Chu kỳ ghi log: 3600 giây (1 tiếng) */
+#define DEFAULT_SENSOR_ENABLE_MASK  0xFF    /* Bật tất cả cảm biến */
+#define DEFAULT_LED_INTENSITY       2       /* Độ sáng LED (0-15) */
+#define DEFAULT_MAINT_HOURS         8760    /* Giờ bảo dưỡng cảm biến: 8760h = 1 năm */
+
+
 /*----------------------------------------------------------
  * Alarm & LEDs
  *---------------------------------------------------------*/
-#define DEFAULT_HIGH_LIMIT         80.0f
 
 /* Cấu hình chân LED báo trạng thái GPS */
 #define GPS_LED_PORT               LED_GPS_GPIO_Port       // Port cho LED GPS (Bạn có thể sửa lại)
