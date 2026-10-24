@@ -18,9 +18,28 @@ static volatile uint32_t oil2_total_pulses = 0;
 static uint32_t last_oil1_total = 0;
 static uint32_t last_oil2_total = 0;
 
-/* Hz đo được trong giây vừa qua */
+/* Hz thô trong giây vừa qua (trước khi lọc) */
 static uint32_t last_diff1 = 0;
 static uint32_t last_diff2 = 0;
+
+/*===========================================================================
+ * Bộ lọc EMA (Exponential Moving Average) — làm mượt Hz hiển thị
+ *
+ * smooth = alpha * new_raw + (1 - alpha) * prev_smooth
+ *
+ * EMA_ALPHA_x10 = 3  →  alpha = 0.3  (phản hồi nhanh, mượt vừa)
+ * Giảm xuống 2 nếu muốn mượt hơn; tăng lên 4-5 nếu muốn phản hồi nhanh hơn.
+ *
+ * ZERO_TIMEOUT_SEC: Số giây diff=0 liên tiếp trước khi báo flow = 0.
+ * Giá trị 3 giây phù hợp cho cảm biến Hall/Turbine thường dùng.
+ *===========================================================================*/
+#define EMA_ALPHA_x10        3U   /* alpha = 0.3 */
+#define ZERO_TIMEOUT_SEC     3U   /* giây */
+
+static float    smooth_hz1 = 0.0f;
+static float    smooth_hz2 = 0.0f;
+static uint8_t  zero_cnt1  = 0;
+static uint8_t  zero_cnt2  = 0;
 
 /* Tổng lít tích lũy — nhất quán với L/h realtime (dùng calibration table) */
 static double oil1_total_liters = 0.0;
@@ -90,6 +109,10 @@ void ExtiCounter_Reset(void)
     last_oil2_total   = 0;
     last_diff1        = 0;
     last_diff2        = 0;
+    smooth_hz1        = 0.0f;
+    smooth_hz2        = 0.0f;
+    zero_cnt1         = 0;
+    zero_cnt2         = 0;
     oil1_last_tick    = 0;
     oil2_last_tick    = 0;
     oil1_total_liters = 0.0;
@@ -104,8 +127,13 @@ void ExtiCounter_Reset(void)
 uint32_t ExtiCounter_GetOil1(void) { return oil1_total_pulses; }
 uint32_t ExtiCounter_GetOil2(void) { return oil2_total_pulses; }
 
-uint32_t ExtiCounter_GetOil1_Hz(void) { return last_diff1; }
-uint32_t ExtiCounter_GetOil2_Hz(void) { return last_diff2; }
+/* Trả về Hz đã lọc EMA — dùng để hiển thị và tính L/h */
+uint32_t ExtiCounter_GetOil1_Hz(void) { return (uint32_t)(smooth_hz1 + 0.5f); }
+uint32_t ExtiCounter_GetOil2_Hz(void) { return (uint32_t)(smooth_hz2 + 0.5f); }
+
+/* Trả về Hz thô (chưa lọc) — dùng cho calibration table nội suy */
+uint32_t ExtiCounter_GetOil1_Hz_Raw(void) { return last_diff1; }
+uint32_t ExtiCounter_GetOil2_Hz_Raw(void) { return last_diff2; }
 
 /*===========================================================================
  * Calibration Table — nội suy tuyến tính
@@ -162,14 +190,61 @@ void ExtiCounter_1s_Process(void)
     last_diff1      = diff1;
     last_diff2      = diff2;
 
-    /* FIX: Tích lũy lít theo calibration table — nhất quán với giá trị L/h hiển thị */
+    /*-----------------------------------------------------------------------
+     * Bộ lọc EMA + Zero Suppression Timeout
+     *
+     * - Khi có xung (diff > 0): cập nhật EMA ngay lập tức → phản hồi nhanh
+     *   smooth = 0.3 * diff + 0.7 * smooth
+     *
+     * - Khi không có xung (diff == 0): tăng bộ đếm zero_cnt.
+     *   Chỉ đưa smooth về 0 sau ZERO_TIMEOUT_SEC giây liên tục không có xung.
+     *   → Tránh nhảy về 0 khi xung thưa hoặc rơi lệch cửa sổ 1s.
+     *-----------------------------------------------------------------------*/
+    /* --- OIL 1 (dầu đi) --- */
+    if (diff1 > 0)
+    {
+        smooth_hz1 = (EMA_ALPHA_x10 * (float)diff1 + (10U - EMA_ALPHA_x10) * smooth_hz1)
+                     / 10.0f;
+        zero_cnt1  = 0;
+    }
+    else
+    {
+        zero_cnt1++;
+        if (zero_cnt1 >= ZERO_TIMEOUT_SEC)
+        {
+            smooth_hz1 = 0.0f;  /* Dừng hẳn — không còn lưu lượng */
+            zero_cnt1  = ZERO_TIMEOUT_SEC; /* Giữ nguyên, không tràn */
+        }
+        /* else: giữ nguyên smooth_hz1 (không cập nhật) */
+    }
+
+    /* --- OIL 2 (dầu hồi) --- */
+    if (diff2 > 0)
+    {
+        smooth_hz2 = (EMA_ALPHA_x10 * (float)diff2 + (10U - EMA_ALPHA_x10) * smooth_hz2)
+                     / 10.0f;
+        zero_cnt2  = 0;
+    }
+    else
+    {
+        zero_cnt2++;
+        if (zero_cnt2 >= ZERO_TIMEOUT_SEC)
+        {
+            smooth_hz2 = 0.0f;
+            zero_cnt2  = ZERO_TIMEOUT_SEC;
+        }
+    }
+
+    /*-----------------------------------------------------------------------
+     * Tích lũy lít — dùng diff1/diff2 thô (không dùng EMA) để đảm bảo
+     * tổng lít chính xác, không bị biến dạng do lọc.
+     *-----------------------------------------------------------------------*/
     if (diff1 > 0)
     {
         float base1  = (OIL_1_CONS > 0) ? ((float)OIL_1_CONS / 10.0f)
                                          : ((float)OIL_IN_PULSE_PER_LITER / 10.0f);
         float coef1  = Get_Interpolated_Coef(diff1, base1);
         double delta = (double)diff1 / (double)coef1;
-        /* Áp dụng bù bọt khí */
         delta *= (100.0 - (double)FORWARD_BUBBLE_PCT) / 100.0;
         oil1_total_liters += delta;
     }
@@ -217,6 +292,8 @@ void ExtiCounter_SetOil1Pulses(uint32_t pulses)
     __disable_irq();
     oil1_total_pulses = pulses;
     last_oil1_total   = pulses; /* FIX: đồng bộ snapshot tránh underflow */
+    smooth_hz1        = 0.0f;  /* Reset bộ lọc khi restore từ Flash */
+    zero_cnt1         = 0;
     __enable_irq();
 }
 
@@ -225,6 +302,8 @@ void ExtiCounter_SetOil2Pulses(uint32_t pulses)
     __disable_irq();
     oil2_total_pulses = pulses;
     last_oil2_total   = pulses;
+    smooth_hz2        = 0.0f;
+    zero_cnt2         = 0;
     __enable_irq();
 }
 

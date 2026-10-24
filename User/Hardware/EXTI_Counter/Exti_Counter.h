@@ -18,8 +18,13 @@ void ExtiCounter_DWT_Init(void);
 uint32_t ExtiCounter_GetOil1(void);
 uint32_t ExtiCounter_GetOil2(void);
 
+/* Hz đã lọc EMA — dùng để hiển thị và tính L/h (mượt, không nhảy) */
 uint32_t ExtiCounter_GetOil1_Hz(void);
 uint32_t ExtiCounter_GetOil2_Hz(void);
+
+/* Hz thô chưa lọc — dùng để debug hoặc calibration */
+uint32_t ExtiCounter_GetOil1_Hz_Raw(void);
+uint32_t ExtiCounter_GetOil2_Hz_Raw(void);
 
 float Get_Interpolated_Coef(uint32_t hz, float default_coef);
 

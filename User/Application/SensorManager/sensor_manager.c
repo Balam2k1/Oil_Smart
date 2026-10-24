@@ -317,11 +317,11 @@ void SensorManager_Update(void)
     /* RPM */
     gSensorData.RPM = 100;
 
-    /* Lưu lượng dầu đi */
-    gSensorData.OilForward = 10;
+    /* Lưu lượng dầu đi — đọc từ EXTI Counter (dầu đi = Oil1, is_return=0) */
+    gSensorData.OilForward = Sensor_CalcOil_Frequency(0);
 
-    /* Lưu lượng dầu về */
-    gSensorData.OilReturn = 10;
+    /* Lưu lượng dầu về — đọc từ EXTI Counter (dầu về = Oil2, is_return=1) */
+    gSensorData.OilReturn = Sensor_CalcOil_Frequency(1);
 
     LOG_Printf(
 	"VIN=%u.%uV P=%uBar T=%u RPM=%u\r\n",
@@ -393,8 +393,14 @@ void SensorManager_Task(void)
         LOG_Printf("[VOLT] Raw: %u -> Vin: %u.%u V\r\n", RawVin, gSensorData.Vin / 10, gSensorData.Vin % 10);
         LOG_Printf("[PRES] Raw: %u -> Pres: %u.%u Bar\r\n", RawPressure, gSensorData.Pressure / 10, gSensorData.Pressure % 10);
         LOG_Printf("[RPM ] Period: %lu us -> RPM: %u\r\n", TimerCounter_GetTachoPeriod(), gSensorData.RPM);
-        LOG_Printf("[OIL+] Freq: %lu Hz | Total: %lu pulses (%lu.%lu L) -> Flow: %u.%u L/h\r\n", ExtiCounter_GetOil1_Hz(), t1, l1 / 10, l1 % 10, gSensorData.OilForward / 10, gSensorData.OilForward % 10);
-        LOG_Printf("[OIL-] Freq: %lu Hz | Total: %lu pulses (%lu.%lu L) -> Flow: %u.%u L/h\r\n", ExtiCounter_GetOil2_Hz(), t2, l2 / 10, l2 % 10, gSensorData.OilReturn / 10, gSensorData.OilReturn % 10);
+        LOG_Printf("[OIL+] Hz_raw=%lu Hz_smooth=%lu | Total: %lu pulses (%lu.%lu L) -> Flow: %u.%u L/h\r\n",
+                   ExtiCounter_GetOil1_Hz_Raw(), ExtiCounter_GetOil1_Hz(),
+                   t1, l1 / 10, l1 % 10,
+                   gSensorData.OilForward / 10, gSensorData.OilForward % 10);
+        LOG_Printf("[OIL-] Hz_raw=%lu Hz_smooth=%lu | Total: %lu pulses (%lu.%lu L) -> Flow: %u.%u L/h\r\n",
+                   ExtiCounter_GetOil2_Hz_Raw(), ExtiCounter_GetOil2_Hz(),
+                   t2, l2 / 10, l2 % 10,
+                   gSensorData.OilReturn / 10, gSensorData.OilReturn % 10);
         LOG_Printf("=========================\r\n");
     }
 
