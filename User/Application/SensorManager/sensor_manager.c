@@ -83,8 +83,9 @@ uint16_t Sensor_CalcRPM_Local(uint32_t period)
 
 uint16_t Sensor_CalcOil_Modbus(uint16_t raw)
 {
-    // Modbus trả tổng xung tích lũy (Flow Meter), không phải L/h trực tiếp.
-    // TODO: Implement difference calculation
+    /* Stub: Modbus oil chưa chuyển được raw → L/h.
+     * Hiển thị/app PHẢI dùng Sensor_CalcOil_Frequency (EXTI). Không gọi hàm này. */
+    (void)raw;
     return 0;
 }
 
@@ -372,14 +373,11 @@ void SensorManager_Task(void)
     else           gSensorData.Pressure = Sensor_CalcPressure_Local(RawPressure);
     if (!(gConfigData.SensorEnableMask & (1 << 2))) gSensorData.Pressure = 0;
 
-    // Oil Forward (Modbus ID 104 -> Index 3)
-    if (Online[3]) gSensorData.OilForward = Sensor_CalcOil_Modbus(RawData[3]);
-    else           gSensorData.OilForward = Sensor_CalcOil_Frequency(0);
+    /* Oil: luôn đo bằng EXTI (xung). Không dùng Modbus stub (luôn trả 0). */
+    gSensorData.OilForward = Sensor_CalcOil_Frequency(0);
     if (!(gConfigData.SensorEnableMask & (1 << 3))) gSensorData.OilForward = 0;
 
-    // Oil Return (Modbus ID 105 -> Index 4)
-    if (Online[4]) gSensorData.OilReturn = Sensor_CalcOil_Modbus(RawData[4]);
-    else           gSensorData.OilReturn = Sensor_CalcOil_Frequency(1);
+    gSensorData.OilReturn = Sensor_CalcOil_Frequency(1);
     if (!(gConfigData.SensorEnableMask & (1 << 4))) gSensorData.OilReturn = 0;
 
     /*================ MANUAL LOG =================*/
