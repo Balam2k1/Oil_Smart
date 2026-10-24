@@ -154,9 +154,10 @@ void MX_GPIO_Init(void)
   HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 
+  /* Sau mọi init GPIO: ép PA15 (EN ESP) HIGH — an toàn khi STM reboot/OTA */
+  HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
 }
 
 /* USER CODE BEGIN 2 */
-  /* Sau mọi init GPIO: ép PA15 (EN ESP) HIGH — an toàn khi STM reboot/OTA */
-  HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
+
 /* USER CODE END 2 */
