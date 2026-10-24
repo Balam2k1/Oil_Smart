@@ -626,8 +626,16 @@ static void ESP32_Process_Command(uint8_t cmd, uint8_t *data, uint8_t len)
             tx_data[21] = (liters_ret_x100 >> 16) & 0xFF;
             tx_data[22] = (liters_ret_x100 >> 8) & 0xFF;
             tx_data[23] = liters_ret_x100 & 0xFF;
+
+            /* L/h x10 riêng từng kênh — app không dùng chung 1 giá trị net từ 0xD2 */
+            uint16_t flow_fwd = gSensorData.OilForward;
+            uint16_t flow_ret = gSensorData.OilReturn;
+            tx_data[24] = (flow_fwd >> 8) & 0xFF;
+            tx_data[25] = flow_fwd & 0xFF;
+            tx_data[26] = (flow_ret >> 8) & 0xFF;
+            tx_data[27] = flow_ret & 0xFF;
             
-            ESP32_Send_Packet(0xCB, 24, tx_data);
+            ESP32_Send_Packet(0xCB, 28, tx_data);
             break;
         }
 

@@ -87,6 +87,13 @@ extern uint16_t PA_CONS;
 #define OIL_OUT_PULSE_PER_LITER     1644
 #define OIL_OUT_TIMER           (&htim14)
 
+/*
+ * Đảo kênh logic dầu đi ↔ dầu hồi (không đổi chân GPIO).
+ * Bật (=1) khi đo thực tế: xung/L/h hồi > đi trong lúc máy chạy
+ * (ngược vật lý: dầu đi phải nhiều hơn dầu hồi).
+ */
+#define OIL_SWAP_CHANNELS           1
+
 
 /*=========================================================
  * DEFAULT VALUES — Chỉnh tất cả giá trị mặc định TẠI ĐÂY

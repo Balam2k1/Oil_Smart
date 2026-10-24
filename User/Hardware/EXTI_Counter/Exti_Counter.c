@@ -124,16 +124,21 @@ void ExtiCounter_Reset(void)
  * Getters — xung và Hz
  *===========================================================================*/
 
+#if OIL_SWAP_CHANNELS
+uint32_t ExtiCounter_GetOil1(void) { return oil2_total_pulses; } /* logic đi ← chân OIL_2 */
+uint32_t ExtiCounter_GetOil2(void) { return oil1_total_pulses; } /* logic hồi ← chân OIL_1 */
+uint32_t ExtiCounter_GetOil1_Hz(void) { return (uint32_t)(smooth_hz2 + 0.5f); }
+uint32_t ExtiCounter_GetOil2_Hz(void) { return (uint32_t)(smooth_hz1 + 0.5f); }
+uint32_t ExtiCounter_GetOil1_Hz_Raw(void) { return last_diff2; }
+uint32_t ExtiCounter_GetOil2_Hz_Raw(void) { return last_diff1; }
+#else
 uint32_t ExtiCounter_GetOil1(void) { return oil1_total_pulses; }
 uint32_t ExtiCounter_GetOil2(void) { return oil2_total_pulses; }
-
-/* Trả về Hz đã lọc EMA — dùng để hiển thị và tính L/h */
 uint32_t ExtiCounter_GetOil1_Hz(void) { return (uint32_t)(smooth_hz1 + 0.5f); }
 uint32_t ExtiCounter_GetOil2_Hz(void) { return (uint32_t)(smooth_hz2 + 0.5f); }
-
-/* Trả về Hz thô (chưa lọc) — dùng cho calibration table nội suy */
 uint32_t ExtiCounter_GetOil1_Hz_Raw(void) { return last_diff1; }
 uint32_t ExtiCounter_GetOil2_Hz_Raw(void) { return last_diff2; }
+#endif
 
 /*===========================================================================
  * Calibration Table — nội suy tuyến tính
@@ -264,15 +269,24 @@ void ExtiCounter_1s_Process(void)
  * Liters — getters / setters
  *===========================================================================*/
 
+#if OIL_SWAP_CHANNELS
+double ExtiCounter_GetOil1Liters(void) { return oil2_total_liters; }
+double ExtiCounter_GetOil2Liters(void) { return oil1_total_liters; }
+void ExtiCounter_SetOil1Liters(double liters) { oil2_total_liters = liters; }
+void ExtiCounter_SetOil2Liters(double liters) { oil1_total_liters = liters; }
+#else
 double ExtiCounter_GetOil1Liters(void) { return oil1_total_liters; }
 double ExtiCounter_GetOil2Liters(void) { return oil2_total_liters; }
-
 void ExtiCounter_SetOil1Liters(double liters) { oil1_total_liters = liters; }
 void ExtiCounter_SetOil2Liters(double liters) { oil2_total_liters = liters; }
+#endif
 
 double ExtiCounter_GetTotalLiters(void)
 {
-    double net = oil1_total_liters - oil2_total_liters;
+    /* Dùng getter (đã áp OIL_SWAP_CHANNELS) — net = đi − hồi */
+    double fwd = ExtiCounter_GetOil1Liters();
+    double ret = ExtiCounter_GetOil2Liters();
+    double net = fwd - ret;
     return (net > 0.0) ? net : 0.0;
 }
 
@@ -290,20 +304,34 @@ void ExtiCounter_SetTotalLiters(double liters)
 void ExtiCounter_SetOil1Pulses(uint32_t pulses)
 {
     __disable_irq();
+#if OIL_SWAP_CHANNELS
+    oil2_total_pulses = pulses;
+    last_oil2_total   = pulses;
+    smooth_hz2        = 0.0f;
+    zero_cnt2         = 0;
+#else
     oil1_total_pulses = pulses;
-    last_oil1_total   = pulses; /* FIX: đồng bộ snapshot tránh underflow */
-    smooth_hz1        = 0.0f;  /* Reset bộ lọc khi restore từ Flash */
+    last_oil1_total   = pulses;
+    smooth_hz1        = 0.0f;
     zero_cnt1         = 0;
+#endif
     __enable_irq();
 }
 
 void ExtiCounter_SetOil2Pulses(uint32_t pulses)
 {
     __disable_irq();
+#if OIL_SWAP_CHANNELS
+    oil1_total_pulses = pulses;
+    last_oil1_total   = pulses;
+    smooth_hz1        = 0.0f;
+    zero_cnt1         = 0;
+#else
     oil2_total_pulses = pulses;
     last_oil2_total   = pulses;
     smooth_hz2        = 0.0f;
     zero_cnt2         = 0;
+#endif
     __enable_irq();
 }
 
