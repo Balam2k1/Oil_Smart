@@ -98,9 +98,10 @@ void Scheduler_Init(void)
     
     LOG_Printf("Init: OK. Registering Tasks...\r\n");
 
-    /* Đăng ký các tác vụ định kỳ */
-    Scheduler_AddTask(SensorManager_Task, TASK_SENSOR_PERIOD_MS);
+    /* Đăng ký các tác vụ định kỳ
+     * ExtiCounter_1s trước SensorManager: cập nhật Hz rồi mới tính L/h dầu. */
     Scheduler_AddTask(ExtiCounter_1s_Process, 1000);
+    Scheduler_AddTask(SensorManager_Task, TASK_SENSOR_PERIOD_MS);
     Scheduler_AddTask(AlarmManager_Task, TASK_ALARM_PERIOD_MS);
     Scheduler_AddTask(FanControl_Task, 20);
     Scheduler_AddTask(DisplayManager_Task, TASK_DISPLAY_PERIOD_MS);

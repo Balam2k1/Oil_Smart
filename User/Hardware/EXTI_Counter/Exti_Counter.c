@@ -71,22 +71,22 @@ void ExtiCounter_DWT_Init(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+    /*
+     * Không đọc lại mức chân sau edge: xung ngắn có thể đã về LOW
+     * → đọc sai rồi return sẽ mất xung → Hz/L/h = 0 trên màn hình.
+     * Tin ngắt rising + debounce theo tick.
+     */
     if (GPIO_Pin == OIL_1_Pin)
     {
-        if (HAL_GPIO_ReadPin(OIL_1_GPIO_Port, OIL_1_Pin) == GPIO_PIN_RESET) return;
-
         uint32_t now = HAL_GetTick();
         if ((now - oil1_last_tick) >= DEBOUNCE_MS)
         {
             oil1_last_tick = now;
             oil1_total_pulses++;
         }
-        /* else: bỏ qua — nhiễu ringing */
     }
     else if (GPIO_Pin == OIL_2_Pin)
     {
-        if (HAL_GPIO_ReadPin(OIL_2_GPIO_Port, OIL_2_Pin) == GPIO_PIN_RESET) return;
-
         uint32_t now = HAL_GetTick();
         if ((now - oil2_last_tick) >= DEBOUNCE_MS)
         {

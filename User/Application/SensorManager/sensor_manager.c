@@ -104,30 +104,33 @@ uint16_t Sensor_CalcOil_Modbus(uint16_t raw)
  */
 uint16_t Sensor_CalcOil_Frequency(uint8_t is_return)
 {
-    uint32_t hz = is_return ? ExtiCounter_GetOil2_Hz() : ExtiCounter_GetOil1_Hz();
+    /* Ưu tiên Hz đã lọc; nếu EMA chưa kịp mà vừa có xung → dùng Hz thô */
+    uint32_t hz_smooth = is_return ? ExtiCounter_GetOil2_Hz() : ExtiCounter_GetOil1_Hz();
+    uint32_t hz_raw    = is_return ? ExtiCounter_GetOil2_Hz_Raw() : ExtiCounter_GetOil1_Hz_Raw();
+    uint32_t hz = (hz_smooth > 0) ? hz_smooth : hz_raw;
     if (hz == 0) return 0;
 
-    /* Hệ số gốc (xung/lít): ưu tiên giá trị người dùng cài, fallback về hằng số compile-time */
+    /* Hệ số gốc (xung/lít): ưu tiên giá trị người dùng cài, fallback compile-time */
     float base_coef;
     if (is_return)
         base_coef = (OIL_2_CONS > 0) ? ((float)OIL_2_CONS / 10.0f) : ((float)OIL_OUT_PULSE_PER_LITER / 10.0f);
     else
         base_coef = (OIL_1_CONS > 0) ? ((float)OIL_1_CONS / 10.0f) : ((float)OIL_IN_PULSE_PER_LITER / 10.0f);
 
-    /* Nội suy theo bảng calibration */
     float actual_coef = Get_Interpolated_Coef(hz, base_coef);
+    if (actual_coef < 0.1f) actual_coef = base_coef;
+    if (actual_coef < 0.1f) return 0;
 
-    /* Tính L/h × 10 */
+    /* L/h × 10 = Hz * 36000 / (xung/lít) */
     float flow = ((float)hz * 36000.0f) / actual_coef;
 
-    /* Bù bọt khí */
     if (is_return)
         flow *= (100.0f - (float)RETURN_BUBBLE_PCT)  / 100.0f;
     else
         flow *= (100.0f - (float)FORWARD_BUBBLE_PCT) / 100.0f;
 
     if (flow > 65535.0f) return 65535;
-    return (uint16_t)flow;
+    return (uint16_t)(flow + 0.5f);
 }
 
 uint16_t Sensor_GetRawData(uint8_t sensor)
@@ -343,6 +346,16 @@ void SensorManager_Task(void)
     /* Cập nhật thông tin cảm biến Modbus */
     SensorManager_UpdateModbus();
 
+    /*
+     * Dầu đi/hồi: cập nhật mỗi chu kỳ task (~200 ms) từ EXTI → LED/app kịp phản hồi.
+     * Không chờ cửa sổ 1 s của ADC/Modbus.
+     */
+    gSensorData.OilForward = Sensor_CalcOil_Frequency(0);
+    if (!(gConfigData.SensorEnableMask & (1 << 3))) gSensorData.OilForward = 0;
+
+    gSensorData.OilReturn = Sensor_CalcOil_Frequency(1);
+    if (!(gConfigData.SensorEnableMask & (1 << 4))) gSensorData.OilReturn = 0;
+
     if((HAL_GetTick() - LastTick) < 1000U)
     {
         return;
@@ -372,13 +385,6 @@ void SensorManager_Task(void)
     if (Online[2]) gSensorData.Pressure = Sensor_CalcPressure_Modbus(RawData[2]);
     else           gSensorData.Pressure = Sensor_CalcPressure_Local(RawPressure);
     if (!(gConfigData.SensorEnableMask & (1 << 2))) gSensorData.Pressure = 0;
-
-    /* Oil: luôn đo bằng EXTI (xung). Không dùng Modbus stub (luôn trả 0). */
-    gSensorData.OilForward = Sensor_CalcOil_Frequency(0);
-    if (!(gConfigData.SensorEnableMask & (1 << 3))) gSensorData.OilForward = 0;
-
-    gSensorData.OilReturn = Sensor_CalcOil_Frequency(1);
-    if (!(gConfigData.SensorEnableMask & (1 << 4))) gSensorData.OilReturn = 0;
 
     /*================ MANUAL LOG =================*/
     uint32_t t1 = ExtiCounter_GetOil1();
