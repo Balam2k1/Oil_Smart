@@ -88,11 +88,10 @@ extern uint16_t PA_CONS;
 #define OIL_OUT_TIMER           (&htim14)
 
 /*
- * Đảo kênh logic dầu đi ↔ dầu hồi (không đổi chân GPIO).
- * Bật (=1) khi đo thực tế: xung/L/h hồi > đi trong lúc máy chạy
- * (ngược vật lý: dầu đi phải nhiều hơn dầu hồi).
+ * Đảo kênh logic dầu đi ↔ dầu hồi. Phần cứng lắp đúng → để 0.
+ * OIL_1 = dầu đi, OIL_2 = dầu hồi (đúng sơ đồ chân).
  */
-#define OIL_SWAP_CHANNELS           1
+#define OIL_SWAP_CHANNELS           0
 
 
 /*=========================================================
