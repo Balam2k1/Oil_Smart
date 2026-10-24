@@ -70,23 +70,16 @@ void ESP32_Init(void)
         TIME_BAODUONG = val;
     }
     
-    /*
-     * KHÔNG gọi ESP32_Reset() khi STM boot.
-     * ESP đang là master OTA: nối BOOT0 (pin 60) + NRST (pin 7).
-     * Nếu STM xung PA15 (EN ESP) lúc khởi động → ESP reboot giữa chừng,
-     * mất điều khiển BOOT0/NRST → không nạp lại STM được (lỗi sau khi lên FW mới).
-     * Giữ PA15 HIGH (xem gpio.c). Chỉ gọi ESP32_Reset() khi chủ động cần.
-     */
-    /* ESP32_Reset(); */
+    /* PA15 / EN ESP: luôn HIGH (OTA: ESP giữ BOOT0+NRST của STM) */
+    HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
     
     last_esp_comm_ms = HAL_GetTick(); // Khởi tạo mốc thời gian
 }
 
 void ESP32_Reset(void)
 {
-    /* EN active-low: kéo thấp reset ESP, rồi nhả cao. Chỉ dùng khi chủ động. */
-    HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_RESET);
-    HAL_Delay(100);
+    /* Không xung LOW — PA15 phải luôn HIGH dù STM reboot.
+     * Chỉ ép lại mức cao (giữ API tương thích). */
     HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
 }
 

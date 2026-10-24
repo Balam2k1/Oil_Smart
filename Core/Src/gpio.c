@@ -51,6 +51,19 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
+  /*--------------------------------------------------------------------
+   * PA15 / RESET_ESSP (EN ESP): cấu hình NGAY và luôn HIGH.
+   * Không gộp với WritePin(..., RESET) của chân GPIOA khác.
+   * ODR=1 trước khi chuyển output → tránh xung LOW khi STM reboot.
+   *--------------------------------------------------------------------*/
+  HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
+  GPIO_InitStruct.Pin = RESET_ESSP_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP; /* dự phòng nếu chân thoáng Hi-Z ngắn */
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(RESET_ESSP_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
+
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, DS_Pin|ST_CP_Pin|SH_CP_Pin|CLK_LED1_Pin
                           |LOAD_DATA1_Pin|LED_PA_C_Pin|FL_CS_Pin|FL_SI_Pin
@@ -59,12 +72,9 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOF, LED_GPS_Pin|LED_OLDC_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level
-   * RESET_ESSP (PA15 → EN ESP): giữ HIGH — không reset ESP khi STM boot,
-   * để ESP tiếp tục điều khiển BOOT0/NRST phục vụ OTA STM. */
+  /* GPIOA còn lại — KHÔNG gồm RESET_ESSP */
   HAL_GPIO_WritePin(GPIOA, DATA_LED1_Pin|LED_TEMP_C_Pin|DIR_485_Pin|RELAY_1_Pin
                           |RELAY_2_Pin|FL_SCK_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, OUT3_Pin|OUT2_Pin|OUT1_Pin|DATA_LED2_Pin
@@ -93,16 +103,13 @@ void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
   /*Configure GPIO pins : DATA_LED1_Pin LED_TEMP_C_Pin DIR_485_Pin RELAY_1_Pin
-                           RELAY_2_Pin FL_SCK_Pin RESET_ESSP_Pin */
+                           RELAY_2_Pin FL_SCK_Pin — không gồm PA15 */
   GPIO_InitStruct.Pin = DATA_LED1_Pin|LED_TEMP_C_Pin|DIR_485_Pin|RELAY_1_Pin
-                          |RELAY_2_Pin|FL_SCK_Pin|RESET_ESSP_Pin;
+                          |RELAY_2_Pin|FL_SCK_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /* Bảo đảm EN ESP = HIGH sau khi PA15 là output */
-  HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : OIL_1_Pin */
   GPIO_InitStruct.Pin = OIL_1_Pin;
@@ -150,5 +157,6 @@ void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 2 */
-
+  /* Sau mọi init GPIO: ép PA15 (EN ESP) HIGH — an toàn khi STM reboot/OTA */
+  HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
 /* USER CODE END 2 */

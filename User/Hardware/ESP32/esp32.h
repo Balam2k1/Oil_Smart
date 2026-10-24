@@ -7,7 +7,7 @@
 /* Khởi tạo UART1 cho ESP32 và các cấu hình liên quan */
 void ESP32_Init(void);
 
-/* Reset ESP32 thông qua chân PA15 */
+/* PA15/EN ESP: chỉ đảm bảo mức HIGH (không xung reset — tránh phá OTA) */
 void ESP32_Reset(void);
 
 /* Task chạy trong vòng lặp chính (Scheduler) để xử lý dữ liệu nhận được */
