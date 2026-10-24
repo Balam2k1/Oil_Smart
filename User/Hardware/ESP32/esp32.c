@@ -70,17 +70,19 @@ void ESP32_Init(void)
         TIME_BAODUONG = val;
     }
     
-    /* Reset ESP32 khi khởi động STM32 */
-    //ESP32_Reset();
+    /* Reset ESP32 khi khởi động STM32 (EN/RESET = PA15) */
+    ESP32_Reset();
     
     last_esp_comm_ms = HAL_GetTick(); // Khởi tạo mốc thời gian
 }
 
 void ESP32_Reset(void)
 {
+    /* EN active-low kiểu ESP: kéo thấp để reset, rồi nhả cao để chạy */
     HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_RESET);
     HAL_Delay(100);
     HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
+    HAL_Delay(50); /* Cho ESP ổn định trước khi giao tiếp UART */
 }
 
 void ESP32_UART_Callback(void)

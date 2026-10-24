@@ -59,11 +59,11 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOF, LED_GPS_Pin|LED_OLDC_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
+  /*Configure GPIO pin Output Level
+   * RESET_ESSP (PA15 → ESP EN): giữ LOW lúc init rồi nhả HIGH sau GPIO_Init
+   * để tránh ESP treo / không boot khi STM vừa nạp code. */
   HAL_GPIO_WritePin(GPIOA, DATA_LED1_Pin|LED_TEMP_C_Pin|DIR_485_Pin|RELAY_1_Pin
                           |RELAY_2_Pin|FL_SCK_Pin|RESET_ESSP_Pin, GPIO_PIN_RESET);
-
-  HAL_GPIO_WritePin(GPIOA,RESET_ESSP_Pin, SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, OUT3_Pin|OUT2_Pin|OUT1_Pin|DATA_LED2_Pin
@@ -99,6 +99,9 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* Nhả ESP khỏi reset sau khi PA15 đã là output (ESP32_Init sẽ pulse lại) */
+  HAL_GPIO_WritePin(RESET_ESSP_GPIO_Port, RESET_ESSP_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : OIL_1_Pin */
   GPIO_InitStruct.Pin = OIL_1_Pin;
