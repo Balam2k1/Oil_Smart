@@ -3,6 +3,7 @@
 #include "max7219.h"
 #include "alarm_manager.h"
 #include "sensor_manager.h"
+#include "app_config.h"
 
 void DisplayManager_Init(void)
 {
@@ -50,12 +51,11 @@ void DisplayManager_Task(void)
       // 1. Cập nhật hiển thị MAX7219 (Kèm nháy 500ms khi quá ngưỡng)
       show_temp_warning(Limit_Temp, gSensorData.Temperature);
       
-      // Tính toán Lưu lượng dòng chảy thực tế (Lít/giờ) = Lưu lượng đi - Lưu lượng về
-      uint16_t net_flow = (gSensorData.OilForward > gSensorData.OilReturn) ? (gSensorData.OilForward - gSensorData.OilReturn) : 0;
-      
-      // Bộ lọc: Giới hạn lưu lượng tiêu thụ hiển thị tối đa là 200 L/h (2000)
-      if (net_flow > 2000) {
-          net_flow = 2000;
+      // Net tiêu hao (L/h x10) = dầu đi − dầu hồi — trần theo cấu hình tàu 350HP
+      uint16_t net_flow = (gSensorData.OilForward > gSensorData.OilReturn)
+                          ? (gSensorData.OilForward - gSensorData.OilReturn) : 0;
+      if (net_flow > OIL_NET_DISPLAY_MAX_XH) {
+          net_flow = OIL_NET_DISPLAY_MAX_XH;
       }
       
       // Hiển thị Lưu lượng chênh lệch và cảnh báo nhấp nháy dựa trên thông số này

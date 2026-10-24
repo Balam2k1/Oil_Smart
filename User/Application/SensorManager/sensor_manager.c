@@ -110,7 +110,6 @@ uint16_t Sensor_CalcOil_Frequency(uint8_t is_return)
     uint32_t hz = (hz_smooth > 0) ? hz_smooth : hz_raw;
     if (hz == 0) return 0;
 
-    /* Hệ số gốc (xung/lít): ưu tiên giá trị người dùng cài, fallback compile-time */
     float base_coef;
     if (is_return)
         base_coef = (OIL_2_CONS > 0) ? ((float)OIL_2_CONS / 10.0f) : ((float)OIL_OUT_PULSE_PER_LITER / 10.0f);
@@ -129,8 +128,28 @@ uint16_t Sensor_CalcOil_Frequency(uint8_t is_return)
     else
         flow *= (100.0f - (float)FORWARD_BUBBLE_PCT) / 100.0f;
 
-    if (flow > 65535.0f) return 65535;
+    if (flow < 0.0f) flow = 0.0f;
+    if (flow > (float)OIL_FLOW_MAX_CHANNEL_XH) flow = (float)OIL_FLOW_MAX_CHANNEL_XH;
     return (uint16_t)(flow + 0.5f);
+}
+
+/* Giới hạn tốc độ đổi L/h (slew) — tránh nhảy số trên app/LED khi bơm xung */
+static uint16_t Oil_SlewLimit(uint16_t target, uint16_t *p_last, uint32_t dt_ms)
+{
+    if (dt_ms == 0) dt_ms = 1;
+    uint32_t max_step = ((uint32_t)OIL_FLOW_SLEW_XH_PER_SEC * dt_ms) / 1000U;
+    if (max_step < 1U) max_step = 1U;
+
+    uint16_t last = *p_last;
+    if (target > last) {
+        uint32_t d = (uint32_t)target - last;
+        if (d > max_step) target = (uint16_t)(last + max_step);
+    } else {
+        uint32_t d = (uint32_t)last - target;
+        if (d > max_step) target = (uint16_t)(last - max_step);
+    }
+    *p_last = target;
+    return target;
 }
 
 uint16_t Sensor_GetRawData(uint8_t sensor)
@@ -347,14 +366,24 @@ void SensorManager_Task(void)
     SensorManager_UpdateModbus();
 
     /*
-     * Dầu đi/hồi: cập nhật mỗi chu kỳ task (~200 ms) từ EXTI → LED/app kịp phản hồi.
-     * Không chờ cửa sổ 1 s của ADC/Modbus.
+     * Dầu đi/hồi: mỗi ~200 ms từ EXTI + slew (bộ lọc hiển thị tàu 350HP).
      */
-    gSensorData.OilForward = Sensor_CalcOil_Frequency(0);
-    if (!(gConfigData.SensorEnableMask & (1 << 3))) gSensorData.OilForward = 0;
+    {
+        static uint16_t last_fwd_xh = 0;
+        static uint16_t last_ret_xh = 0;
+        static uint32_t last_oil_tick = 0;
+        uint32_t now = HAL_GetTick();
+        uint32_t dt = (last_oil_tick == 0) ? TASK_SENSOR_PERIOD_MS : (now - last_oil_tick);
+        last_oil_tick = now;
 
-    gSensorData.OilReturn = Sensor_CalcOil_Frequency(1);
-    if (!(gConfigData.SensorEnableMask & (1 << 4))) gSensorData.OilReturn = 0;
+        uint16_t fwd = Sensor_CalcOil_Frequency(0);
+        uint16_t ret = Sensor_CalcOil_Frequency(1);
+        if (!(gConfigData.SensorEnableMask & (1 << 3))) fwd = 0;
+        if (!(gConfigData.SensorEnableMask & (1 << 4))) ret = 0;
+
+        gSensorData.OilForward = Oil_SlewLimit(fwd, &last_fwd_xh, dt);
+        gSensorData.OilReturn  = Oil_SlewLimit(ret, &last_ret_xh, dt);
+    }
 
     if((HAL_GetTick() - LastTick) < 1000U)
     {

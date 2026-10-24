@@ -72,11 +72,15 @@ extern uint16_t PA_CONS;
 
 
 /*=========================================================
- * OIL FLOW SENSOR
- * Dựa trên bảng đo thực tế: 21 Lít = 3453 xung.
- * Suy ra: 1 Lít = 3453 / 21 = 164.428 xung.
- * Để tính toán không cần số thập phân (float), ta nhân hệ số lên 10 lần.
- * -> Hệ số mặc định mới: 1644.
+ * OIL FLOW SENSOR — động cơ tàu ~350 HP (diesel, đường đi/hồi)
+ *
+ * Kỳ vọng thực tế (tham khảo):
+ *   - Tiêu hao net (đi − hồi): idle ~10–25 L/h, hành trình ~40–80, full ~80–120 L/h
+ *   - Lưu lượng đường đi (cấp): thường 150–400 L/h tùy bơm
+ *   - Đường hồi: đi − tiêu hao (có thể nhiều bọt hơn)
+ *
+ * Hệ số (x10): 21 L = 3453 xung → 164.4 xung/L → lưu 1644.
+ * Hiệu chuẩn lại trên tàu: lệnh 0xF3 (chốt xung) → chạy đủ lâu → 0xF4 (lít thật).
  *=========================================================*/
 
 /* Dầu đi */
@@ -93,6 +97,15 @@ extern uint16_t PA_CONS;
  */
 #define OIL_SWAP_CHANNELS           0
 
+/* --- Bộ lọc Hz / L/h (350 HP, bơm diesel có xung) --- */
+#define OIL_EMA_ALPHA_x10           2U     /* alpha=0.2 — mượt nhiễu bơm, vẫn theo ga */
+#define OIL_ZERO_TIMEOUT_SEC        2U     /* hết xung 2 s → L/h = 0 */
+#define OIL_DEBOUNCE_MS             1U     /* 1 ms: đủ tới ~수백 Hz; ít mất xung lưu lượng cao */
+#define OIL_HZ_SPIKE_MULT_x10       30U    /* bỏ mẫu raw > 3.0× Hz đang mượt (đinh nhiễu) */
+#define OIL_FLOW_SLEW_XH_PER_SEC    1000U  /* max đổi ±100.0 L/h mỗi giây (x10) khi hiển thị */
+#define OIL_FLOW_MAX_CHANNEL_XH     8000U  /* trần 1 kênh: 800.0 L/h */
+#define OIL_NET_DISPLAY_MAX_XH      3000U  /* trần net trên LED: 300.0 L/h */
+
 
 /*=========================================================
  * DEFAULT VALUES — Chỉnh tất cả giá trị mặc định TẠI ĐÂY
@@ -108,23 +121,24 @@ extern uint16_t PA_CONS;
 #define DEFAULT_LIMIT_PA_MIN        25      /* Áp suất min: 2.5 Bar (x10) */
 #define DEFAULT_LIMIT_VIN_MIN       110     /* Điện áp thấp: 11.0 V (x10) */
 #define DEFAULT_LIMIT_VIN_MAX       150     /* Điện áp cao: 15.0 V (x10) */
-#define DEFAULT_LIMIT_OIL           1000    /* Lưu lượng dầu min: 100.0 L/h (x10) */
+#define DEFAULT_LIMIT_OIL           1500    /* Net dầu cảnh báo cao: 150.0 L/h (x10) — tàu 350HP */
 #define DEFAULT_LIMIT_RPM           3000    /* Vòng tua: 3000 RPM */
 #define DEFAULT_LIMIT_MAINT_TIME    5000    /* Giờ bảo dưỡng: 5000 giờ */
 
 /* --- Hệ số cảm biến (Calibration Constants) ---
  * Lưu ý: Giá trị lưu trong Flash là x10 để tránh số thực.
  * Ví dụ: VOLT_CONS = 36300 tức là R1+R2 = 36300 Ohm
- *        OIL_CONS  = 1644  tức là 164.4 xung/lít            */
+ *        OIL_CONS  = 1644  tức là 164.4 xung/lít
+ * Cân chỉnh: đo bình thật (đi / hồi riêng) → 0xD6 / 0xD7 hoặc 0xF3+0xF4. */
 #define DEFAULT_VOLT_CONS           36300   /* Tổng trở chia áp (R1+R2) tính bằng Ohm */
 #define DEFAULT_TEMP_CONS           750     /* Hệ số bù nhiệt (x1000) — 1000 = không bù */
 #define DEFAULT_PA_CONS             372     /* Hệ số bù áp suất */
 #define DEFAULT_OIL_1_CONS          1644    /* Xung/lít x10 — dầu đi  (164.4 xung/lít) */
 #define DEFAULT_OIL_2_CONS          1644    /* Xung/lít x10 — dầu về  (164.4 xung/lít) */
 
-/* --- Bù bọt khí (Bubble Compensation) --- */
+/* --- Bù bọt khí (Bubble Compensation) — đường hồi thường nhiều bọt hơn --- */
 #define DEFAULT_FORWARD_BUBBLE_PCT  0       /* % bọt khí dầu đi  (0-100) */
-#define DEFAULT_RETURN_BUBBLE_PCT   0       /* % bọt khí dầu về  (0-100) */
+#define DEFAULT_RETURN_BUBBLE_PCT   5       /* % bọt khí dầu về  (0-100) */
 
 /* --- Ghi log & hệ thống --- */
 #define DEFAULT_LOG_INTERVAL        3600    /* Chu kỳ ghi log: 3600 giây (1 tiếng) */

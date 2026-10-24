@@ -23,19 +23,8 @@ static uint32_t last_diff1 = 0;
 static uint32_t last_diff2 = 0;
 
 /*===========================================================================
- * Bộ lọc EMA (Exponential Moving Average) — làm mượt Hz hiển thị
- *
- * smooth = alpha * new_raw + (1 - alpha) * prev_smooth
- *
- * EMA_ALPHA_x10 = 3  →  alpha = 0.3  (phản hồi nhanh, mượt vừa)
- * Giảm xuống 2 nếu muốn mượt hơn; tăng lên 4-5 nếu muốn phản hồi nhanh hơn.
- *
- * ZERO_TIMEOUT_SEC: Số giây diff=0 liên tiếp trước khi báo flow = 0.
- * Giá trị 3 giây phù hợp cho cảm biến Hall/Turbine thường dùng.
+ * Bộ lọc EMA + chống đinh — tham số trong app_config.h (tàu ~350 HP)
  *===========================================================================*/
-#define EMA_ALPHA_x10        3U   /* alpha = 0.3 */
-#define ZERO_TIMEOUT_SEC     3U   /* giây */
-
 static float    smooth_hz1 = 0.0f;
 static float    smooth_hz2 = 0.0f;
 static uint8_t  zero_cnt1  = 0;
@@ -47,19 +36,12 @@ static double oil2_total_liters = 0.0;
 
 /* Bảng hiệu chỉnh và hệ số bọt khí */
 CalibrationPoint_t g_calib_table[10] = {0};
-uint16_t RETURN_BUBBLE_PCT  = 0;
-uint16_t FORWARD_BUBBLE_PCT = 0;
+uint16_t RETURN_BUBBLE_PCT  = DEFAULT_RETURN_BUBBLE_PCT;
+uint16_t FORWARD_BUBBLE_PCT = DEFAULT_FORWARD_BUBBLE_PCT;
 
 /*===========================================================================
- * EXTI Callback — đếm xung rising edge với software debounce
- *
- * STM32F030 (Cortex-M0) không có DWT/CYCCNT → dùng HAL_GetTick() (1 ms).
- * Nếu 2 rising edge cách nhau < DEBOUNCE_MS → bỏ qua (nhiễu ringing).
- *
- * Cảm biến Hall/Turbine thường >= 5 ms giữa 2 xung thật ở lưu lượng cao.
+ * EXTI Callback — đếm xung rising + debounce (OIL_DEBOUNCE_MS)
  *===========================================================================*/
-
-#define DEBOUNCE_MS     2U   /* ms — tăng nếu cảm biến bị nhiễu nhiều hơn */
 
 static uint32_t oil1_last_tick = 0;
 static uint32_t oil2_last_tick = 0;
@@ -79,7 +61,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     if (GPIO_Pin == OIL_1_Pin)
     {
         uint32_t now = HAL_GetTick();
-        if ((now - oil1_last_tick) >= DEBOUNCE_MS)
+        if ((now - oil1_last_tick) >= OIL_DEBOUNCE_MS)
         {
             oil1_last_tick = now;
             oil1_total_pulses++;
@@ -88,7 +70,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     else if (GPIO_Pin == OIL_2_Pin)
     {
         uint32_t now = HAL_GetTick();
-        if ((now - oil2_last_tick) >= DEBOUNCE_MS)
+        if ((now - oil2_last_tick) >= OIL_DEBOUNCE_MS)
         {
             oil2_last_tick = now;
             oil2_total_pulses++;
@@ -208,35 +190,47 @@ void ExtiCounter_1s_Process(void)
     /* --- OIL 1 (dầu đi) --- */
     if (diff1 > 0)
     {
-        smooth_hz1 = (EMA_ALPHA_x10 * (float)diff1 + (10U - EMA_ALPHA_x10) * smooth_hz1)
-                     / 10.0f;
+        /* Chống đinh: raw đột biến >> smooth → kẹp trước khi đưa vào EMA */
+        float sample1 = (float)diff1;
+        if (smooth_hz1 > 2.0f &&
+            sample1 > smooth_hz1 * ((float)OIL_HZ_SPIKE_MULT_x10 / 10.0f))
+        {
+            sample1 = smooth_hz1 * ((float)OIL_HZ_SPIKE_MULT_x10 / 10.0f);
+        }
+        smooth_hz1 = (OIL_EMA_ALPHA_x10 * sample1 +
+                      (10U - OIL_EMA_ALPHA_x10) * smooth_hz1) / 10.0f;
         zero_cnt1  = 0;
     }
     else
     {
         zero_cnt1++;
-        if (zero_cnt1 >= ZERO_TIMEOUT_SEC)
+        if (zero_cnt1 >= OIL_ZERO_TIMEOUT_SEC)
         {
-            smooth_hz1 = 0.0f;  /* Dừng hẳn — không còn lưu lượng */
-            zero_cnt1  = ZERO_TIMEOUT_SEC; /* Giữ nguyên, không tràn */
+            smooth_hz1 = 0.0f;
+            zero_cnt1  = OIL_ZERO_TIMEOUT_SEC;
         }
-        /* else: giữ nguyên smooth_hz1 (không cập nhật) */
     }
 
     /* --- OIL 2 (dầu hồi) --- */
     if (diff2 > 0)
     {
-        smooth_hz2 = (EMA_ALPHA_x10 * (float)diff2 + (10U - EMA_ALPHA_x10) * smooth_hz2)
-                     / 10.0f;
+        float sample2 = (float)diff2;
+        if (smooth_hz2 > 2.0f &&
+            sample2 > smooth_hz2 * ((float)OIL_HZ_SPIKE_MULT_x10 / 10.0f))
+        {
+            sample2 = smooth_hz2 * ((float)OIL_HZ_SPIKE_MULT_x10 / 10.0f);
+        }
+        smooth_hz2 = (OIL_EMA_ALPHA_x10 * sample2 +
+                      (10U - OIL_EMA_ALPHA_x10) * smooth_hz2) / 10.0f;
         zero_cnt2  = 0;
     }
     else
     {
         zero_cnt2++;
-        if (zero_cnt2 >= ZERO_TIMEOUT_SEC)
+        if (zero_cnt2 >= OIL_ZERO_TIMEOUT_SEC)
         {
             smooth_hz2 = 0.0f;
-            zero_cnt2  = ZERO_TIMEOUT_SEC;
+            zero_cnt2  = OIL_ZERO_TIMEOUT_SEC;
         }
     }
 
